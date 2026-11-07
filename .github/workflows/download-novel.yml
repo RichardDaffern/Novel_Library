@@ -8,11 +8,29 @@ on:
         required: true
         type: string
       chapter_range:
-        description: 'Optional chapter range (e.g. 1-30; blank for entire novel)'
+        description: 'Optional inclusive chapter range (e.g. 1-30; blank for all)'
         required: false
         type: string
       force:
-        description: 'Force download even if already completed'
+        description: 'Force fresh download even when an archive already exists'
+        required: false
+        type: boolean
+        default: false
+
+
+  workflow_call:
+    inputs:
+      novel_url:
+        description: 'Novel URL to download using bounded chapter batches'
+        required: true
+        type: string
+      chapter_range:
+        description: 'Optional inclusive chapter range; blank means all'
+        required: false
+        type: string
+        default: ''
+      force:
+        description: 'Force fresh download and bypass reusable cached ranges'
         required: false
         type: boolean
         default: false
@@ -20,27 +38,32 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  actions: read
 
-# Serialise runs to prevent duplicate checks and registry PR merge conflicts.
 concurrency:
   group: novel-library-registry
   cancel-in-progress: false
 
 jobs:
-  archive:
+  prepare:
     runs-on: ubuntu-latest
-    timeout-minutes: 180
+    timeout-minutes: 25
+    outputs:
+      skip: ${{ steps.registry.outputs.skip }}
+      matrix: ${{ steps.make_plan.outputs.matrix }}
+      key: ${{ steps.make_plan.outputs.key }}
+      first: ${{ steps.make_plan.outputs.first }}
+      last: ${{ steps.make_plan.outputs.last }}
     steps:
       - uses: actions/checkout@v4
         with:
           ref: main
-
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
           cache: pip
 
-      - name: Check downloaded-novel registry before downloading
+      - name: Check registry before doing any downloading
         id: registry
         env:
           NOVEL_URL: ${{ inputs.novel_url }}
@@ -51,48 +74,141 @@ jobs:
           if [[ "$FORCE" == "true" ]]; then args+=(--force); fi
           "${args[@]}"
 
-      - name: Already downloaded - no action needed
+      - name: Already downloaded
         if: steps.registry.outputs.skip == 'true'
-        env:
-          NOVEL_URL: ${{ inputs.novel_url }}
-          CHAPTER_RANGE: ${{ inputs.chapter_range }}
         run: |
-          echo "::notice::Already downloaded. Select Force to download again while the existing artifact is available."
-          echo "## Already downloaded" >> "$GITHUB_STEP_SUMMARY"
-          echo "No new download was started. URL: $NOVEL_URL ; range: $CHAPTER_RANGE. Select Force to override." >> "$GITHUB_STEP_SUMMARY"
+          echo "::notice::Already downloaded. Select Force to download again."
+          echo "The requested novel and range are already in an available GitHub Actions artifact." >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Install dependencies
+      - name: Install FanFicFare
         if: steps.registry.outputs.skip != 'true'
         run: python -m pip install -r requirements.txt
 
-      - name: Verify downloader and registry tests
-        if: steps.registry.outputs.skip != 'true'
-        run: python -m unittest discover -s tests -v
-
-      - name: Download and export chapters
+      - name: Index chapters and calculate batches
+        id: make_plan
         if: steps.registry.outputs.skip != 'true'
         env:
           NOVEL_URL: ${{ inputs.novel_url }}
           CHAPTER_RANGE: ${{ inputs.chapter_range }}
-          PYTHONUNBUFFERED: '1'
         run: |
-          args=(python -u novel_downloader.py "$NOVEL_URL" --confirm-rights --output-dir downloads --timeout-minutes 170)
-          if [[ -n "$CHAPTER_RANGE" ]]; then args+=(--chapter-range "$CHAPTER_RANGE"); fi
-          "${args[@]}"
+          python -u -m tools.chunked_download plan \
+            --url "$NOVEL_URL" --chapter-range "$CHAPTER_RANGE" \
+            --chunk-size 200 --plan-file chapter_plan.json
 
-      - name: Upload download artifact (including partial checkpoints after errors)
-        id: upload
-        if: always() && steps.registry.outputs.skip != 'true'
+      - name: Save chapter plan for final assembly
+        if: steps.registry.outputs.skip != 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: novel-${{ github.run_id }}
-          path: downloads/
-          if-no-files-found: warn
+          name: chapter-plan-${{ github.run_id }}-${{ steps.make_plan.outputs.key }}
+          path: chapter_plan.json
           retention-days: 7
+          if-no-files-found: error
+
+  chapter-batches:
+    needs: prepare
+    if: needs.prepare.outputs.skip != 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix: ${{ fromJson(needs.prepare.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Install downloader dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Recover previous complete batch or download range
+        env:
+          NOVEL_URL: ${{ inputs.novel_url }}
+          FORCE: ${{ inputs.force }}
+          GH_TOKEN: ${{ github.token }}
+          PYTHONUNBUFFERED: '1'
+        timeout-minutes: 75
+        run: |
+          args=(python -u -m tools.chunked_download fetch
+            --url "$NOVEL_URL"
+            --key "${{ needs.prepare.outputs.key }}"
+            --start "${{ matrix.start }}"
+            --end "${{ matrix.end }}"
+            --timeout-minutes 65
+            --scratch-dir scratch
+            --output-dir part)
+          if [[ "$FORCE" == "true" ]]; then args+=(--force); fi
+          "${args[@]}"
+
+      - name: Upload verified chapter batch
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.name }}
+          path: part/
+          retention-days: 7
+          if-no-files-found: error
           compression-level: 6
 
-      - name: Validate download and update registry files
-        if: success() && steps.registry.outputs.skip != 'true'
+      - name: Preserve checkpoint files when a batch fails
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: partial-batch-${{ github.run_id }}-${{ needs.prepare.outputs.key }}-${{ matrix.start }}-${{ matrix.end }}
+          path: scratch/
+          retention-days: 7
+          if-no-files-found: ignore
+
+  assemble:
+    needs: [prepare, chapter-batches]
+    if: needs.prepare.outputs.skip != 'true' && needs.chapter-batches.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Install EPUB parser dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Restore chapter plan
+        uses: actions/download-artifact@v4
+        with:
+          name: chapter-plan-${{ github.run_id }}-${{ needs.prepare.outputs.key }}
+          path: .
+
+      - name: Retrieve every complete chapter batch
+        uses: actions/download-artifact@v4
+        with:
+          pattern: chapter-batch-${{ needs.prepare.outputs.key }}-*
+          path: completed_batches
+          merge-multiple: false
+
+      - name: Assemble and validate combined EPUB and TXT chapters
+        env:
+          NOVEL_URL: ${{ inputs.novel_url }}
+        run: |
+          python -u -m tools.chunked_download assemble \
+            --url "$NOVEL_URL" \
+            --plan-file chapter_plan.json \
+            --chunks-dir completed_batches --output-dir downloads
+
+      - name: Upload complete novel archive
+        id: upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: novel-${{ github.run_id }}-${{ needs.prepare.outputs.key }}
+          path: downloads/
+          retention-days: 7
+          if-no-files-found: error
+          compression-level: 6
+
+      - name: Register completed download
         env:
           NOVEL_URL: ${{ inputs.novel_url }}
           CHAPTER_RANGE: ${{ inputs.chapter_range }}
@@ -107,25 +223,39 @@ jobs:
             --artifact-url "$ARTIFACT_URL" \
             --downloads-dir downloads
 
-      - name: Open PR for downloaded-novel index and merge to main
-        if: success() && steps.registry.outputs.skip != 'true'
+      - name: Open and squash-merge registry-only pull request
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          BRANCH="registry/download-$GITHUB_RUN_ID"
+          BRANCH="registry/download-$GITHUB_RUN_ID-${{ needs.prepare.outputs.key }}"
           git switch -c "$BRANCH"
           git add downloaded_novels.json DOWNLOADED_NOVELS.md
-          git diff --cached --quiet && { echo "Registry already up to date"; exit 0; }
-          git commit -m "Track completed novel download (run $GITHUB_RUN_ID)"
+          git commit -m "Track completed novel archive ($GITHUB_RUN_ID)"
           git push --set-upstream origin "$BRANCH"
           PR_URL="$(gh pr create --base main --head "$BRANCH" \
             --title "Track completed novel download #$GITHUB_RUN_ID" \
-            --body "Add the completed download to the metadata-only registry. EPUBs and chapter text remain in the Actions artifact; no novel content is committed.")"
-          echo "Opened registry pull request: $PR_URL"
+            --body "Only validated novel metadata is committed. The full EPUB and TXT files are in the Actions artifact.")"
           echo "Registry PR: $PR_URL" >> "$GITHUB_STEP_SUMMARY"
           gh pr merge "$PR_URL" --squash --delete-branch
-          echo "Registry PR merged into main." >> "$GITHUB_STEP_SUMMARY"
-          echo "Artifact: ${{ steps.upload.outputs.artifact-url }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "Complete archive: ${{ steps.upload.outputs.artifact-url }}" >> "$GITHUB_STEP_SUMMARY"
+
+  report:
+    needs: [prepare, chapter-batches, assemble]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Report completion or recoverable failed batches
+        env:
+          PREPARE: ${{ needs.prepare.result }}
+          BATCHES: ${{ needs.chapter-batches.result }}
+          ASSEMBLY: ${{ needs.assemble.result }}
+        run: |
+          echo "## Download status" >> "$GITHUB_STEP_SUMMARY"
+          echo "Indexing: $PREPARE; chapter batches: $BATCHES; assembly: $ASSEMBLY" >> "$GITHUB_STEP_SUMMARY"
+          if [[ "$PREPARE" == "failure" || "$BATCHES" == "failure" || "$ASSEMBLY" == "failure" ]]; then
+            echo "::error::One or more chapter batches failed. Verified completed batches can be reused on the next run. Partial checkpoints are saved as artifacts."
+            exit 1
+          fi

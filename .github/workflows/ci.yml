@@ -33,6 +33,25 @@ jobs:
           assert (p/'source.epub').stat().st_size>1000
           print('Two individual TXT files and partial EPUB created')
           PY
+      - name: Verify independent batches combine into one EPUB (offline)
+        run: |
+          python -u -m tools.chunked_download plan --self-test --chapter-range 1-4 --chunk-size 2 --plan-file ci_plan.json
+          KEY=$(python -c "from tools.chunked_download import identity,SYNTHETIC_URL;print(identity(SYNTHETIC_URL))")
+          python -u -m tools.chunked_download fetch --self-test --key "$KEY" --start 1 --end 2 --output-dir "ci_parts/chapter-batch-${KEY}-00001-00002" --scratch-dir ci_scratch1
+          python -u -m tools.chunked_download fetch --self-test --key "$KEY" --start 3 --end 4 --output-dir "ci_parts/chapter-batch-${KEY}-00003-00004" --scratch-dir ci_scratch2
+          python -u -m tools.chunked_download assemble --self-test --plan-file ci_plan.json --chunks-dir ci_parts --output-dir ci_combined
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from novel_downloader import epub_chapters
+          book = Path('ci_combined/fanficfare-smoke-test')
+          rows = json.loads((book / 'chapters.json').read_text())
+          assert [r['position'] for r in rows] == [1, 2, 3, 4]
+          assert all((book / r['file']).stat().st_size > 30 for r in rows)
+          _, chapters = epub_chapters(book / 'source.epub')
+          assert len(chapters) == 4
+          print('Verified four distinct synthetic TXT chapters and one reassembled EPUB')
+          PY
       - name: Check NovelFull chapter discovery (no chapter text downloaded)
         continue-on-error: true
         timeout-minutes: 6
@@ -68,6 +87,15 @@ jobs:
           cache: pip
       - run: python -m pip install -r requirements.txt
       - run: python -m unittest discover -s tests -v
+      - name: Verify chunked EPUB assembly on Windows (offline)
+        shell: pwsh
+        run: |
+          python -m tools.chunked_download plan --self-test --chapter-range 1-4 --chunk-size 2 --plan-file ci_plan_win.json
+          $Key = python -c "from tools.chunked_download import identity,SYNTHETIC_URL;print(identity(SYNTHETIC_URL))"
+          python -m tools.chunked_download fetch --self-test --key "$Key" --start 1 --end 2 --output-dir "ci_win_parts/chapter-batch-$Key-00001-00002" --scratch-dir ci_win_scratch1
+          python -m tools.chunked_download fetch --self-test --key "$Key" --start 3 --end 4 --output-dir "ci_win_parts/chapter-batch-$Key-00003-00004" --scratch-dir ci_win_scratch2
+          python -m tools.chunked_download assemble --self-test --plan-file ci_plan_win.json --chunks-dir ci_win_parts --output-dir ci_win_combined
+          python -c "import json,pathlib; b=pathlib.Path('ci_win_combined/fanficfare-smoke-test'); assert len(json.loads((b/'chapters.json').read_text()))==4; assert (b/'source.epub').is_file(); print('Windows combined EPUB and TXT verified')"
       - name: Verify 2-chapter range with TXT and EPUB on Windows
         run: |
           python -u novel_downloader.py --self-test --chapter-range 3-4 --output-dir smoke
