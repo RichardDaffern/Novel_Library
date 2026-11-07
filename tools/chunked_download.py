@@ -111,7 +111,7 @@ def validate_piece(folder: Path, url: str, key: str, first: int, last: int) -> d
         chapter_file = book_dir / name
         if not chapter_file.is_file() or chapter_file.stat().st_size < 30:
             raise ValueError(f"Missing or empty chapter file: {name}")
-        if row.get("sha256") != sha256(chapter_file.read_bytes()).hexdigest():
+        if row.get("sha256") != sha256(chapter_file.read_text(encoding="utf-8").encode("utf-8")).hexdigest():
             raise ValueError(f"Invalid chapter checksum: {name}")
     return {"metadata": metadata, "chapters": rows, "folder": book_dir}
 
@@ -270,7 +270,7 @@ def assemble(plan: dict, chunks_dir: Path, output_dir: Path) -> Path:
     for row in all_rows:
         dest = f"chapter_{row['position']:05d}.txt"
         shutil.copyfile(row["_source"], book / dest)
-        if sha256((book / dest).read_bytes()).hexdigest() != row["sha256"]:
+        if sha256((book / dest).read_text(encoding="utf-8").encode("utf-8")).hexdigest() != row["sha256"]:
             raise ValueError(f"Failed to verify combined chapter {row['position']}")
         merged.append({k: v for k, v in row.items() if k != "_source"} | {"file": dest})
     first_metadata = titles[0]
