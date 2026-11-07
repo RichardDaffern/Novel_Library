@@ -1,0 +1,125 @@
+name: Bulk Download Novels
+
+on:
+  workflow_dispatch:
+    inputs:
+      novel_urls:
+        description: 'Novel URLs (separate with commas, spaces or newlines; maximum 10)'
+        required: true
+        type: string
+      chapter_range:
+        description: 'Optional chapter range applied to each novel (e.g. 1-30)'
+        required: false
+        type: string
+      force:
+        description: 'Force downloading even if already completed'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+# Serialise registry updates with the existing single-novel workflow.
+concurrency:
+  group: novel-library-registry
+  cancel-in-progress: false
+
+jobs:
+  download-novels:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - name: Parse URLs and skip already-downloaded novels
+        id: plan
+        env:
+          NOVEL_URLS: ${{ inputs.novel_urls }}
+          CHAPTER_RANGE: ${{ inputs.chapter_range }}
+          FORCE: ${{ inputs.force }}
+        run: |
+          args=(python -m tools.bulk_download plan --urls "$NOVEL_URLS" --chapter-range "$CHAPTER_RANGE")
+          if [[ "$FORCE" == "true" ]]; then args+=(--force); fi
+          "${args[@]}"
+
+      - name: Already downloaded - nothing to download
+        if: steps.plan.outputs.has_work == 'false'
+        run: echo "::notice::All requested novels are already downloaded and their artifacts are available. Select Force to redownload."
+
+      - name: Install dependencies
+        if: steps.plan.outputs.has_work == 'true'
+        run: python -m pip install -r requirements.txt
+
+      - name: Verify downloader and registry tests
+        if: steps.plan.outputs.has_work == 'true'
+        run: python -m unittest discover -s tests -v
+
+      - name: Download requested novels one at a time
+        id: download
+        if: steps.plan.outputs.has_work == 'true'
+        timeout-minutes: 320
+        env:
+          PYTHONUNBUFFERED: '1'
+        run: python -u -m tools.bulk_download download --budget-minutes 305
+
+      - name: Upload novels as a downloadable GitHub artifact
+        id: upload
+        if: always() && steps.plan.outputs.has_work == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: bulk-novels-${{ github.run_id }}
+          path: |
+            downloads/
+            batch_results.json
+          if-no-files-found: warn
+          retention-days: 7
+          compression-level: 6
+
+      - name: Validate and register successfully downloaded novels
+        id: register
+        if: steps.download.outcome == 'success' && steps.upload.outputs.artifact-id != ''
+        env:
+          ARTIFACT_ID: ${{ steps.upload.outputs.artifact-id }}
+          ARTIFACT_URL: ${{ steps.upload.outputs.artifact-url }}
+        run: |
+          python -m tools.bulk_download record \
+            --run-id "$GITHUB_RUN_ID" \
+            --artifact-id "$ARTIFACT_ID" \
+            --artifact-url "$ARTIFACT_URL"
+
+      - name: Raise and merge one PR updating the novel list
+        if: steps.register.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          BRANCH="registry/bulk-$GITHUB_RUN_ID"
+          git switch -c "$BRANCH"
+          git add downloaded_novels.json DOWNLOADED_NOVELS.md
+          if git diff --cached --quiet; then
+            echo "No newly completed novels to record."
+            exit 0
+          fi
+          git commit -m "Track completed bulk novel downloads (run $GITHUB_RUN_ID)"
+          git push --set-upstream origin "$BRANCH"
+          PR_URL="$(gh pr create --base main --head "$BRANCH" \
+            --title "Track bulk novel downloads #$GITHUB_RUN_ID" \
+            --body "Registry-only update after verified downloads. Chapter text and EPUBs are only in the Actions artifact.")"
+          echo "Registry pull request: $PR_URL" >> "$GITHUB_STEP_SUMMARY"
+          gh pr merge "$PR_URL" --squash --delete-branch
+          echo "Metadata PR merged into main." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Publish per-novel status summary
+        if: always() && steps.plan.outcome == 'success'
+        run: python -m tools.bulk_download report
