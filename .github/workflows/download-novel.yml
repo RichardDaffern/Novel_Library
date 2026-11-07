@@ -17,6 +17,24 @@ on:
         type: boolean
         default: false
 
+
+  workflow_call:
+    inputs:
+      novel_url:
+        description: 'Novel URL to download using bounded chapter batches'
+        required: true
+        type: string
+      chapter_range:
+        description: 'Optional inclusive chapter range; blank means all'
+        required: false
+        type: string
+        default: ''
+      force:
+        description: 'Force fresh download and bypass reusable cached ranges'
+        required: false
+        type: boolean
+        default: false
+
 permissions:
   contents: write
   pull-requests: write
