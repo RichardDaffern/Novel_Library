@@ -73,7 +73,29 @@ class BulkDownloadTests(unittest.TestCase):
                                "--results-file", str(root / "result.json")])
             self.assertEqual(result, 0)
             self.assertIn("has_work=false", gh_output.read_text())
+            self.assertIn('matrix={"include":[]}', gh_output.read_text())
             self.assertEqual(len(json.loads((root / "result.json").read_text())["skipped"]), 1)
+
+    def test_bulk_matrix_dispatches_authorised_novels_to_child_workflows(self):
+        with tempfile.TemporaryDirectory() as temp:
+            base = Path(temp)
+            output = base / "github_output.txt"
+            registry = base / "registry.json"
+            registry.write_text(json.dumps(registry_with_download()))
+            with patch.dict("os.environ", {"GITHUB_OUTPUT": str(output)}):
+                rc = main([
+                    "plan", "--urls", f"{URL1}\n{URL2}",
+                    "--registry", str(registry), "--chapter-range", "1-2",
+                    "--plan-file", str(base / "plan.json"),
+                ])
+            self.assertEqual(rc, 0)
+            values = dict(line.split("=", 1) for line in output.read_text().splitlines())
+            self.assertEqual(values["has_work"], "true")
+            entries = json.loads(values["matrix"])["include"]
+            self.assertEqual(len(entries), 1)
+            self.assertEqual(entries[0]["novel_url"], URL2)
+            self.assertEqual(entries[0]["chapter_range"], "1-2")
+            self.assertFalse(entries[0]["force"])
 
     def test_continues_after_one_failure_and_preserves_result(self):
         plan = create_plan({"version": 1, "novels": []}, f"{URL1} {URL2} {URL3}", "1-2")
