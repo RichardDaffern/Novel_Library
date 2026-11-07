@@ -53,6 +53,26 @@ For automatic PR creation and merging, the repository owner must enable **Settin
 
 **Important:** Your repository is currently public. GitHub Actions artifacts may be accessible to other users of public repositories. Making a repository private limits exposure but does not grant permission to redistribute copyrighted content.
 
+## GitHub Actions: Bulk Download Novels
+
+Use **Actions > Bulk Download Novels > Run workflow** to supply up to **10 different novels** in one run.
+
+The **Novel URLs** field accepts URLs separated by **commas, spaces or newlines**. For example, you can paste:
+
+~~~text
+https://example.org/story-one.html, https://example.org/story-two.html
+~~~
+
+Optional fields:
+- **Chapter range**: applies the same inclusive range (e.g. 1-2) to every novel. Leave blank for entire novels.
+- **Force**: defaults to off; bypasses the downloaded-novels registry when selected.
+
+The workflow normalises and deduplicates URLs, checks the registry **before downloading**, and skips novels with available artifacts (unless forced). It downloads the remaining novels **sequentially**, saving each in its own directory to avoid filename collisions. A failed novel does not stop the remaining novels.
+
+At the end, GitHub creates one **bulk-novels-<run id>** ZIP artifact containing the generated EPUB/TXT files and a JSON results report, retained for seven days. Successfully completed novels are validated and added together to the registry, through **one metadata-only pull request that GitHub Actions attempts to merge into main**. Novels that fail are not recorded as complete. Any failed novel causes the overall workflow to show a failure, even if some books completed and their files were uploaded; check the per-novel job summary.
+
+The job has a bounded runtime budget and is restricted to 10 distinct URLs per run. For automatic PR merging, enable the same GitHub Actions PR-creation permission described above. As with the single-novel action, only submit books you are authorised to archive; files in public Actions artifacts may be accessible to others. Novel text and EPUBs are not committed to Git.
+
 ## Downloaded-novel list
 
 View [DOWNLOADED_NOVELS.md](DOWNLOADED_NOVELS.md) for completed downloads. The initial index includes three previously verified completed jobs. The registry is an index, **not permanent storage**: once an artifact expires, a normal rerun is allowed so the book can be archived again, subject to permission.
