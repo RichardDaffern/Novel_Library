@@ -1,24 +1,30 @@
-name: Download permitted novel
+name: Download novel
 
 on:
   workflow_dispatch:
     inputs:
       novel_url:
-        description: 'FanFicFare-supported novel URL (HTTPS)'
+        description: 'Novel URL'
         required: true
         type: string
-      confirm_rights:
-        description: 'I have permission to download and store this work, including in GitHub Actions artifacts'
-        required: true
-        type: boolean
-        default: false
       chapter_range:
-        description: 'Optional inclusive chapter positions, e.g. 1-30 (blank means all)'
+        description: 'Optional chapter range (e.g. 1-30; blank for entire novel)'
         required: false
         type: string
+      force:
+        description: 'Force download even if already completed'
+        required: false
+        type: boolean
+        default: false
 
 permissions:
-  contents: read
+  contents: write
+  pull-requests: write
+
+# Serialise runs to prevent duplicate checks and registry PR merge conflicts.
+concurrency:
+  group: novel-library-registry
+  cancel-in-progress: false
 
 jobs:
   archive:
@@ -26,15 +32,45 @@ jobs:
     timeout-minutes: 180
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: main
+
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
           cache: pip
+
+      - name: Check downloaded-novel registry before downloading
+        id: registry
+        env:
+          NOVEL_URL: ${{ inputs.novel_url }}
+          CHAPTER_RANGE: ${{ inputs.chapter_range }}
+          FORCE: ${{ inputs.force }}
+        run: |
+          args=(python tools/download_registry.py check --url "$NOVEL_URL" --chapter-range "$CHAPTER_RANGE")
+          if [[ "$FORCE" == "true" ]]; then args+=(--force); fi
+          "${args[@]}"
+
+      - name: Already downloaded - no action needed
+        if: steps.registry.outputs.skip == 'true'
+        env:
+          NOVEL_URL: ${{ inputs.novel_url }}
+          CHAPTER_RANGE: ${{ inputs.chapter_range }}
+        run: |
+          echo "::notice::Already downloaded. Select Force to download again while the existing artifact is available."
+          echo "## Already downloaded" >> "$GITHUB_STEP_SUMMARY"
+          echo "No new download was started. URL: $NOVEL_URL ; range: $CHAPTER_RANGE. Select Force to override." >> "$GITHUB_STEP_SUMMARY"
+
       - name: Install dependencies
+        if: steps.registry.outputs.skip != 'true'
         run: python -m pip install -r requirements.txt
-      - name: Verify chapter export
+
+      - name: Verify downloader and registry tests
+        if: steps.registry.outputs.skip != 'true'
         run: python -m unittest discover -s tests -v
+
       - name: Download and export chapters
+        if: steps.registry.outputs.skip != 'true'
         env:
           NOVEL_URL: ${{ inputs.novel_url }}
           CHAPTER_RANGE: ${{ inputs.chapter_range }}
@@ -43,8 +79,10 @@ jobs:
           args=(python -u novel_downloader.py "$NOVEL_URL" --confirm-rights --output-dir downloads --timeout-minutes 170)
           if [[ -n "$CHAPTER_RANGE" ]]; then args+=(--chapter-range "$CHAPTER_RANGE"); fi
           "${args[@]}"
-      - name: Upload private download artifact
-        if: always()
+
+      - name: Upload download artifact (including partial checkpoints after errors)
+        id: upload
+        if: always() && steps.registry.outputs.skip != 'true'
         uses: actions/upload-artifact@v4
         with:
           name: novel-${{ github.run_id }}
@@ -52,3 +90,42 @@ jobs:
           if-no-files-found: warn
           retention-days: 7
           compression-level: 6
+
+      - name: Validate download and update registry files
+        if: success() && steps.registry.outputs.skip != 'true'
+        env:
+          NOVEL_URL: ${{ inputs.novel_url }}
+          CHAPTER_RANGE: ${{ inputs.chapter_range }}
+          ARTIFACT_ID: ${{ steps.upload.outputs.artifact-id }}
+          ARTIFACT_URL: ${{ steps.upload.outputs.artifact-url }}
+        run: |
+          python tools/download_registry.py record \
+            --url "$NOVEL_URL" \
+            --chapter-range "$CHAPTER_RANGE" \
+            --run-id "$GITHUB_RUN_ID" \
+            --artifact-id "$ARTIFACT_ID" \
+            --artifact-url "$ARTIFACT_URL" \
+            --downloads-dir downloads
+
+      - name: Open PR for downloaded-novel index and merge to main
+        if: success() && steps.registry.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          BRANCH="registry/download-$GITHUB_RUN_ID"
+          git switch -c "$BRANCH"
+          git add downloaded_novels.json DOWNLOADED_NOVELS.md
+          git diff --cached --quiet && { echo "Registry already up to date"; exit 0; }
+          git commit -m "Track completed novel download (run $GITHUB_RUN_ID)"
+          git push --set-upstream origin "$BRANCH"
+          PR_URL="$(gh pr create --base main --head "$BRANCH" \
+            --title "Track completed novel download #$GITHUB_RUN_ID" \
+            --body "Add the completed download to the metadata-only registry. EPUBs and chapter text remain in the Actions artifact; no novel content is committed.")"
+          echo "Opened registry pull request: $PR_URL"
+          echo "Registry PR: $PR_URL" >> "$GITHUB_STEP_SUMMARY"
+          gh pr merge "$PR_URL" --squash --delete-branch
+          echo "Registry PR merged into main." >> "$GITHUB_STEP_SUMMARY"
+          echo "Artifact: ${{ steps.upload.outputs.artifact-url }}" >> "$GITHUB_STEP_SUMMARY"
