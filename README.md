@@ -1,53 +1,62 @@
 # Novel Library
 
-FanFicFare-based local downloader and EPUB chapter exporter. **Only download and store works where you have permission and the site permits automated access.** This project does not circumvent access controls. Downloaded books are not committed to Git.
+Local-first novel downloader built using FanFicFare. Produces numbered UTF-8 TXT chapters, an EPUB, a JSON chapter manifest and chapter-completion percentages.
 
-## Install (Python 3.12)
+**Only download and store material you are permitted to archive.** This project does not circumvent source-site access controls. Do not publicly distribute copyrighted chapter text without permission. Novel text and EPUBs are **not** checked into this Git repository.
 
-```powershell
+## Run locally
+
+Install Python 3.12 and the dependencies:
+
+~~~powershell
 python -m pip install -r requirements.txt
 python -m unittest discover -s tests -v
-```
+~~~
 
-Run a complete offline, nine-chapter synthetic test:
+Test the download-to-EPUB pipeline without external network requests:
 
-```powershell
-python -u novel_downloader.py --self-test
-```
+~~~powershell
+python novel_downloader.py --self-test --chapter-range 1-2
+~~~
 
-Test an inclusive three-chapter range, without contacting any website:
+For material you are authorised to download, use a supported HTTPS URL:
 
-```powershell
-python -u novel_downloader.py --self-test --chapter-range 3-5
-```
+~~~powershell
+python -u novel_downloader.py "https://example.org/novel" --confirm-rights
+python -u novel_downloader.py "https://example.org/novel" --confirm-rights --chapter-range 1-30
+~~~
 
-For an authorised novel URL:
+Chapter ranges are one-based, inclusive positions in the site's chapter index. The script prints a chapter-completion percentage and writes a TXT file into the chapters_in_progress directory as soon as each chapter finishes. After successful EPUB creation, it exports the final chapters, manifest and metadata and removes temporary checkpoints.
 
-```powershell
-python -u novel_downloader.py "https://example.com/novel" --confirm-rights --chapter-range 1-30
-python -u novel_downloader.py "https://example.com/novel" --confirm-rights --chapter-range 31-60
-```
+## GitHub Actions: Download novel
 
-Chapter positions are **1-based and inclusive** in the FanFicFare chapter index, including prologues. The standalone `--begin-chapter` and `--end-chapter` flags remain supported. Each range has a separate EPUB and folder, avoiding accidental reuse of a previous range.
+In **Actions > Download novel > Run workflow**, enter:
 
-## Where individual chapter files go
+- **Novel URL**: the source URL
+- **Chapter range**: optional, e.g. 1-30; blank requests the whole novel
+- **Force**: defaults to **off**; select it to bypass the downloaded-novel registry
 
-While the downloader is running, each fetched chapter is saved immediately under `downloads/<novel-name>/chapters_in_progress/chapter_00001.txt`. The console prints `Saved checkpoint` and `Chapters processed: 3/30 (10.0%)`. Chapter percentages count completed chapters, not HTTP requests. Chapter-index discovery happens before chapter downloading and may itself take time.
+There is no permission-confirmation checkbox in the Actions form; the workflow passes the script's local --confirm-rights flag internally. Only run authorised downloads.
 
-After a successful EPUB export, the folder contains `source.epub`, `metadata.json`, `chapters.json`, and numbered `chapter_*.txt` files. The temporary checkpoints are then removed. On errors, checkpoints remain in the folder; automatic mid-run resume is **not** implemented.
+The workflow checks downloaded_novels.json **before downloading chapters**. A completed download is treated as available only while its GitHub Actions artifact has not expired. A full-novel entry covers all smaller ranges; combined completed ranges can also cover a requested range. If already available, the workflow exits successfully with an **Already downloaded** notice. Force bypasses that check. Workflows are serialised to avoid conflicting registry updates.
 
-The `chapters.json` manifest records chapter-index positions, headings, filenames, word counts and checksums. Output folders for ranges include both boundaries, e.g. `novel-chapters-0001-0030`.
+Successful runs save the actual EPUB and TXT chapter files as a GitHub Actions artifact, retained for **seven days**. The novel content is not committed to the repository. Partial checkpoints may also be uploaded when downloads fail.
 
-## GitHub Actions
+After uploading and validating the output, the workflow:
 
-The **Test novel library** workflow runs unit tests and a complete synthetic FanFicFare download on Linux and Windows, plus a short public-domain EPUB import. It tests the range `3-5` and uploads the **verified-test-books** artifact (synthetic and public-domain test files only). A NovelFull index-only compatibility check for *Interstellar Era: Starting as a Cleaner* is nonblocking and downloads no story text.
+1. Adds the download metadata, range, chapter count, run link and artifact-expiry information to downloaded_novels.json.
+2. Regenerates [DOWNLOADED_NOVELS.md](DOWNLOADED_NOVELS.md), the human-readable index.
+3. Creates a registry/download-<run id> branch and pull request.
+4. Attempts to **squash-merge that metadata-only PR into main** automatically.
 
-The **Download permitted novel** workflow is manually triggered. Supply the URL, acknowledge that you have archive rights, and optionally enter a single range such as `1-30`. This workflow refuses to run on a **public repository**, to avoid exposing private archives through downloadable GitHub artifacts. Change the repository to private before using it. GitHub Actions artifacts are downloadable only after a workflow run finishes; they are not live files on your laptop.
+For automatic PR creation and merging, the repository owner must enable **Settings > Actions > General > Workflow permissions > Allow GitHub Actions to create and approve pull requests**. The workflow token also needs contents and pull-requests write access, configured in the workflow. Branch protection requiring approvals or status checks can prevent immediate merging; an unmerged PR will remain available for review. The artifact is uploaded even if the registry PR subsequently fails.
 
-## Offline EPUB imports
+**Important:** Your repository is currently public. GitHub Actions artifacts may be accessible to other users of public repositories. Making a repository private limits exposure but does not grant permission to redistribute copyrighted content.
 
-```powershell
-python novel_downloader.py --import-epub "C:\\Books\\book.epub"
-```
+## Downloaded-novel list
 
-For download permissions, see the source website's terms and the author's licence.
+View [DOWNLOADED_NOVELS.md](DOWNLOADED_NOVELS.md) for completed downloads. The initial index includes three previously verified completed jobs. The registry is an index, **not permanent storage**: once an artifact expires, a normal rerun is allowed so the book can be archived again, subject to permission.
+
+## Other tests
+
+The CI workflow verifies two synthetic chapters on Linux and Windows. A separate probe has confirmed that FanFicFare can retrieve and parse two real NovelFull chapter bodies, but it does not retain their text. Do not confuse retrieval tests with authorisation to publish those chapters.
