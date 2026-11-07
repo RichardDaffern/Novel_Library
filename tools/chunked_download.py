@@ -264,7 +264,7 @@ def assemble(plan: dict, chunks_dir: Path, output_dir: Path) -> Path:
     positions = [row["position"] for row in all_rows]
     if positions != list(range(plan["first"], plan["last"] + 1)):
         raise ValueError("Missing, duplicated or unordered chapters during assembly")
-    book = output_dir / slugify(Path(urlsplit(url).path).stem or "synthetic-test")
+    book = output_dir / slugify("fanficfare-smoke-test" if url == SYNTHETIC_URL else (Path(urlsplit(url).path).stem or "novel"))
     book.mkdir(parents=True, exist_ok=True)
     merged: list[dict] = []
     for row in all_rows:
