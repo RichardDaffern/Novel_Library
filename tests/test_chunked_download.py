@@ -122,6 +122,32 @@ class ChapterBatchTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 assemble(plan, root, root / "out")
 
+    def test_complete_batch_is_recovered_without_redownloading(self):
+        import shutil
+        from types import SimpleNamespace
+        from unittest.mock import patch
+        from tools.chunked_download import reuse_complete_piece, fetch_piece
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source = make_piece(root / "cached", URL, identity(URL), 1, 2)
+            destination = root / "restored"
+            artifact = {"name": f"chapter-batch-{identity(URL)}-00001-00002",
+                        "workflow_run": {"id": 321}}
+            calls = []
+
+            def simulate_gh(args, **kwargs):
+                calls.append(args)
+                output = Path(args[args.index("-D") + 1])
+                shutil.copytree(source, output, dirs_exist_ok=True)
+                return SimpleNamespace(returncode=0)
+
+            with patch("tools.chunked_download._prior_artifacts", return_value=[artifact]):
+                with patch("tools.chunked_download.subprocess.run", side_effect=simulate_gh):
+                    fetch_piece(URL, identity(URL), 1, 2, destination, root / "scratch")
+            self.assertEqual(len(calls), 1)
+            self.assertEqual(calls[0][:3], ["gh", "run", "download"])
+            self.assertEqual(len(validate_piece(destination, URL, identity(URL), 1, 2)["chapters"]), 2)
+
     def test_synthetic_url_identity_is_stable(self):
         plan = chapter_plan(SYNTHETIC_URL, 9, "3-4")
         self.assertEqual(plan["pieces"][0]["name"],
