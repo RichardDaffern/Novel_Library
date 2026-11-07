@@ -2,20 +2,20 @@
   "version": 1,
   "novels": [
     {
-      "url": "https://novelfull.com/she-is-from-the-countryside.html",
-      "title": "She Is From the Countryside",
-      "author": "",
+      "url": "https://novelfull.com/abe-the-wizard.html",
+      "title": "Abe the Wizard",
+      "author": "The Mass Of Eating Melon Seeds",
       "downloads": [
         {
           "range": "all",
           "status": "complete",
-          "chapter_count": 624,
-          "run_id": 42368620891,
-          "run_url": "https://github.com/RichardDaffern/Novel_Library/actions/runs/42368620891",
-          "artifact_id": 13574785699,
-          "artifact_url": "https://github.com/RichardDaffern/Novel_Library/actions/runs/42368620891/artifacts/13574785699",
-          "completed_at_utc": "2026-11-07T12:28:28Z",
-          "expires_at_utc": "2026-11-14T12:28:22Z"
+          "chapter_count": 1512,
+          "run_id": 42393126629,
+          "run_url": "https://github.com/RichardDaffern/Novel_Library/actions/runs/42393126629",
+          "artifact_id": 13592251409,
+          "artifact_url": "https://github.com/RichardDaffern/Novel_Library/actions/runs/42393126629/artifacts/13592251409",
+          "completed_at_utc": "2026-11-07T21:53:01Z",
+          "expires_at_utc": "2026-11-14T21:53:01Z"
         }
       ]
     },
@@ -34,6 +34,24 @@
           "artifact_url": "https://github.com/RichardDaffern/Novel_Library/actions/runs/42368776684/artifacts/13574863593",
           "completed_at_utc": "2026-11-07T12:55:24Z",
           "expires_at_utc": "2026-11-14T12:55:20Z"
+        }
+      ]
+    },
+    {
+      "url": "https://novelfull.com/she-is-from-the-countryside.html",
+      "title": "She Is From the Countryside",
+      "author": "",
+      "downloads": [
+        {
+          "range": "all",
+          "status": "complete",
+          "chapter_count": 624,
+          "run_id": 42368620891,
+          "run_url": "https://github.com/RichardDaffern/Novel_Library/actions/runs/42368620891",
+          "artifact_id": 13574785699,
+          "artifact_url": "https://github.com/RichardDaffern/Novel_Library/actions/runs/42368620891/artifacts/13574785699",
+          "completed_at_utc": "2026-11-07T12:28:28Z",
+          "expires_at_utc": "2026-11-14T12:28:22Z"
         }
       ]
     },
