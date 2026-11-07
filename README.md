@@ -38,9 +38,9 @@ In **Actions > Download novel > Run workflow**, enter:
 
 There is no permission-confirmation checkbox in the Actions form; the workflow passes the script's local --confirm-rights flag internally. Only run authorised downloads.
 
-The workflow checks downloaded_novels.json **before downloading chapters**. A completed download is treated as available only while its GitHub Actions artifact has not expired. A full-novel entry covers all smaller ranges; combined completed ranges can also cover a requested range. If already available, the workflow exits successfully with an **Already downloaded** notice. Force bypasses that check. Workflows are serialised to avoid conflicting registry updates.
+The workflow checks downloaded_novels.json **before downloading chapters**. It then discovers the full chapter count and divides the requested range into automatically managed batches of **up to 200 chapters**, with up to two concurrent chapter-download jobs. Each batch has its own timeout, so a 4,000-chapter novel is no longer limited by a single 170-minute process. A rerun automatically **reuses complete verified batch artifacts** that have not expired, and downloads only missing or failed batches unless Force is selected. If a batch times out, its temporary chapter checkpoints are uploaded separately, but the incomplete batch is retried on the next run. No partially downloaded book is registered as complete. A completed download is treated as available only while its GitHub Actions artifact has not expired. A full-novel entry covers all smaller ranges; combined completed ranges can also cover a requested range. If already available, the workflow exits successfully with an **Already downloaded** notice. Force bypasses that check. Workflows are serialised to avoid conflicting registry updates.
 
-Successful runs save the actual EPUB and TXT chapter files as a GitHub Actions artifact, retained for **seven days**. The novel content is not committed to the repository. Partial checkpoints may also be uploaded when downloads fail.
+When all batches are complete, an assembly job verifies every selected chapter position, creates **one complete EPUB** and numbered TXT collection, and uploads them as a final artifact retained for **seven days**. Verified intermediate batches also have seven-day retention. The first run using the new workflow cannot automatically reuse the checkpoints from the older, pre-chunking timeout run. The novel content is not committed to the repository. Partial checkpoints may also be uploaded when downloads fail.
 
 After uploading and validating the output, the workflow:
 
@@ -55,23 +55,13 @@ For automatic PR creation and merging, the repository owner must enable **Settin
 
 ## GitHub Actions: Bulk Download Novels
 
-Use **Actions > Bulk Download Novels > Run workflow** to supply up to **10 different novels** in one run.
+Use **Actions > Bulk Download Novels > Run workflow** and enter up to 10 distinct authorised novel URLs separated by commas, spaces or newlines. You may specify one inclusive chapter range for all novels and use Force to bypass the existing-archive check.
 
-The **Novel URLs** field accepts URLs separated by **commas, spaces or newlines**. For example, you can paste:
+The bulk workflow checks the downloaded-novels registry once, removes duplicate URLs and **calls the same automatic chunked downloader for each outstanding novel**. Novels run sequentially to avoid overwhelming the source website and avoid registry merge conflicts, but chapter ranges *within* each novel run in separate bounded GitHub jobs. A failed novel does not prevent later novels from running.
 
-~~~text
-https://example.org/story-one.html, https://example.org/story-two.html
-~~~
+**Each completed novel has its own EPUB/TXT ZIP artifact within the bulk workflow run**, rather than a combined batch ZIP. Each novel updates the Markdown/JSON index through a separate metadata-only pull request. All artifacts are retained for seven days. Individual verified chapter-range artifacts can be reused on retry, unless Force is selected.
 
-Optional fields:
-- **Chapter range**: applies the same inclusive range (e.g. 1-2) to every novel. Leave blank for entire novels.
-- **Force**: defaults to off; bypasses the downloaded-novels registry when selected.
-
-The workflow normalises and deduplicates URLs, checks the registry **before downloading**, and skips novels with available artifacts (unless forced). It downloads the remaining novels **sequentially**, saving each in its own directory to avoid filename collisions. A failed novel does not stop the remaining novels.
-
-At the end, GitHub creates one **bulk-novels-<run id>** ZIP artifact containing the generated EPUB/TXT files and a JSON results report, retained for seven days. Successfully completed novels are validated and added together to the registry, through **one metadata-only pull request that GitHub Actions attempts to merge into main**. Novels that fail are not recorded as complete. Any failed novel causes the overall workflow to show a failure, even if some books completed and their files were uploaded; check the per-novel job summary.
-
-The job has a bounded runtime budget and is restricted to 10 distinct URLs per run. For automatic PR merging, enable the same GitHub Actions PR-creation permission described above. As with the single-novel action, only submit books you are authorised to archive; files in public Actions artifacts may be accessible to others. Novel text and EPUBs are not committed to Git.
+The overall bulk workflow reports failure if any novel fails; completed novels and their downloadable artifacts remain available. The workflows do not publish novel text or EPUBs in Git, and only authorised downloads should be submitted.
 
 ## Downloaded-novel list
 
