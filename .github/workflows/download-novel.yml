@@ -99,7 +99,7 @@ jobs:
         if: steps.registry.outputs.skip != 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: chapter-plan-${{ github.run_id }}
+          name: chapter-plan-${{ github.run_id }}-${{ steps.make_plan.outputs.key }}
           path: chapter_plan.json
           retention-days: 7
           if-no-files-found: error
@@ -155,7 +155,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: partial-batch-${{ github.run_id }}-${{ matrix.start }}-${{ matrix.end }}
+          name: partial-batch-${{ github.run_id }}-${{ needs.prepare.outputs.key }}-${{ matrix.start }}-${{ matrix.end }}
           path: scratch/
           retention-days: 7
           if-no-files-found: ignore
@@ -179,7 +179,7 @@ jobs:
       - name: Restore chapter plan
         uses: actions/download-artifact@v4
         with:
-          name: chapter-plan-${{ github.run_id }}
+          name: chapter-plan-${{ github.run_id }}-${{ needs.prepare.outputs.key }}
           path: .
 
       - name: Retrieve every complete chapter batch
@@ -202,7 +202,7 @@ jobs:
         id: upload
         uses: actions/upload-artifact@v4
         with:
-          name: novel-${{ github.run_id }}
+          name: novel-${{ github.run_id }}-${{ needs.prepare.outputs.key }}
           path: downloads/
           retention-days: 7
           if-no-files-found: error
@@ -230,7 +230,7 @@ jobs:
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          BRANCH="registry/download-$GITHUB_RUN_ID"
+          BRANCH="registry/download-$GITHUB_RUN_ID-${{ needs.prepare.outputs.key }}"
           git switch -c "$BRANCH"
           git add downloaded_novels.json DOWNLOADED_NOVELS.md
           git commit -m "Track completed novel archive ($GITHUB_RUN_ID)"
