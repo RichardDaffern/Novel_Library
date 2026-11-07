@@ -165,6 +165,15 @@ def main(argv: list[str] | None = None) -> int:
         plan = create_plan(read_registry(args.registry), args.urls, args.chapter_range, args.force)
         _save_json(args.plan_file, plan)
         _append_output("has_work", "true" if plan["planned"] else "false")
+        matrix = {"include": [
+            {
+                "novel_url": entry["url"],
+                "chapter_range": "" if entry["range"] == "all" else entry["range"],
+                "force": plan["force"],
+            }
+            for entry in plan["planned"]
+        ]}
+        _append_output("matrix", json.dumps(matrix, separators=(",", ":")))
         print(f"Batch: {len(plan['planned'])} to download, {len(plan['skipped'])} already available", flush=True)
         for item in plan["skipped"]:
             print(f"SKIPPED (already downloaded): {item['url']} [{item['range']}]", flush=True)
