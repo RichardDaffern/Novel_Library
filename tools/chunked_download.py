@@ -46,7 +46,7 @@ def chapter_plan(url: str, total: int, chapter_range: str = "",
         raise ValueError(f"Requested chapter {last}, but story index contains only {total}")
     key = identity(url)
     pieces = [
-        {"start": start, "end": min(last, start + chunk_size - 1)}
+        {"start": start, "end": min(last, start + chunk_size - 1), "name": f"chapter-batch-{key}-{start:05d}-{min(last, start + chunk_size - 1):05d}"}
         for start in range(first, last + 1, chunk_size)
     ]
     if len(pieces) > MAX_CHUNKS:
