@@ -1,0 +1,70 @@
+name: Download permitted novel
+
+on:
+  workflow_dispatch:
+    inputs:
+      novel_url:
+        description: 'FanFicFare-supported novel URL (HTTPS)'
+        required: true
+        type: string
+      confirm_rights:
+        description: 'I have permission to download and store this work, including in GitHub Actions artifacts'
+        required: true
+        type: boolean
+        default: false
+      chapter_range:
+        description: 'Optional inclusive chapter positions, e.g. 1-30 (blank means all)'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  archive:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - name: Prevent public release of private reading material
+        env:
+          REPOSITORY_PRIVATE: ${{ github.event.repository.private }}
+        run: |
+          if [[ "$REPOSITORY_PRIVATE" != "true" ]]; then
+            echo "::error::This repository is public. Download artifacts are accessible to repository readers. Switch it to private before running novel downloads."
+            exit 1
+          fi
+      - name: Verify permission acknowledgement
+        env:
+          RIGHTS_CONFIRMED: ${{ inputs.confirm_rights }}
+        run: |
+          if [[ "$RIGHTS_CONFIRMED" != "true" ]]; then
+            echo "You must confirm that you have permission to archive this work." >&2
+            exit 1
+          fi
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Verify chapter export
+        run: python -m unittest discover -s tests -v
+      - name: Download and export chapters
+        env:
+          NOVEL_URL: ${{ inputs.novel_url }}
+          CHAPTER_RANGE: ${{ inputs.chapter_range }}
+          PYTHONUNBUFFERED: '1'
+        run: |
+          args=(python -u novel_downloader.py "$NOVEL_URL" --confirm-rights --output-dir downloads --timeout-minutes 170)
+          if [[ -n "$CHAPTER_RANGE" ]]; then args+=(--chapter-range "$CHAPTER_RANGE"); fi
+          "${args[@]}"
+      - name: Upload private download artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: novel-${{ github.run_id }}
+          path: downloads/
+          if-no-files-found: warn
+          retention-days: 7
+          compression-level: 6

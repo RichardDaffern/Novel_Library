@@ -1,0 +1,74 @@
+name: Test novel library
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - run: python -m pip install -r requirements.txt
+      - run: python -m unittest discover -s tests -v
+      - name: Verify inclusive range creates two chapter files
+        run: |
+          python -u novel_downloader.py --self-test --chapter-range 3-4 --output-dir smoke
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p = Path('smoke/fanficfare-smoke-test-chapters-0003-0004')
+          rows = json.loads((p/'chapters.json').read_text())
+          assert len(rows)==2, f'Expected 2 chapters, got {len(rows)}'
+          assert [row['position'] for row in rows]==[3, 4]
+          assert all((p/row['file']).stat().st_size>20 for row in rows)
+          assert (p/'source.epub').stat().st_size>1000
+          print('Two individual TXT files and partial EPUB created')
+          PY
+      - name: Check NovelFull chapter discovery (no chapter text downloaded)
+        continue-on-error: true
+        timeout-minutes: 6
+        env:
+          PYTHONUNBUFFERED: '1'
+        run: |
+          python -u novel_downloader.py "https://novelfull.com/interstellar-era-starting-as-a-cleaner.html" --confirm-rights --list-only > /tmp/novelfull-metadata.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          data = json.loads(Path('/tmp/novelfull-metadata.json').read_text())
+          count = int(data.get('numChapters', 0))
+          assert count >= 1, f'Expected at least one chapter link, got {count}'
+          print(f'NovelFull adapter chapter discovery succeeded: {count} entries (metadata only)')
+          PY
+      - name: Upload two-chapter synthetic test output
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: two-chapter-smoke-test
+          path: smoke/
+          retention-days: 3
+          if-no-files-found: error
+
+  windows-smoke:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - run: python -m pip install -r requirements.txt
+      - run: python -m unittest discover -s tests -v
+      - name: Verify 2-chapter range with TXT and EPUB on Windows
+        run: |
+          python -u novel_downloader.py --self-test --chapter-range 3-4 --output-dir smoke
+          python -c "import pathlib,json; p=pathlib.Path('smoke/fanficfare-smoke-test-chapters-0003-0004'); assert len(json.loads((p/'chapters.json').read_text()))==2; print('Windows chapters verified')"
