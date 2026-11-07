@@ -116,8 +116,12 @@ class DownloadRegistryTests(unittest.TestCase):
             data = registry_with(item("1-2"))
             data["novels"][0]["downloads"][0]["artifact_url"] = "https://github.com/example"
             write_registry(data, base / "novels.json", base / "novels.md")
-            self.assertIn("Sample", (base / "novels.md").read_text())
-            self.assertIn("https://github.com/example", (base / "novels.md").read_text())
+            rendered = (base / "novels.md").read_text()
+            self.assertIn("| Novel | Range | Chapters | Artifact | Expiry (UTC) |", rendered)
+            self.assertIn("[Sample](https://novelfull.com/sample.html)", rendered)
+            self.assertNotIn("| Source |", rendered)
+            self.assertNotIn("[URL](", rendered)
+            self.assertIn("https://github.com/example", rendered)
             self.assertEqual(read_registry(base / "novels.json")["version"], 1)
 
     def test_existing_completed_downloads_backfilled(self):

@@ -118,8 +118,8 @@ def write_registry(registry: dict, json_path: Path, md_path: Path) -> None:
         "Actual text/EPUB files are in temporary GitHub Actions artifacts, **not the Git repository**.",
         "Expired artifacts cannot be retrieved; such entries remain as history but will not block a new download.",
         "",
-        "| Novel | Source | Range | Chapters | Artifact | Expiry (UTC) |",
-        "|---|---|---|---:|---|---|",
+        "| Novel | Range | Chapters | Artifact | Expiry (UTC) |",
+        "|---|---|---:|---|---|",
     ]
     for novel in registry["novels"]:
         for item in sorted(novel.get("downloads", []), key=lambda v: v.get("completed_at_utc", "")):
@@ -127,12 +127,12 @@ def write_registry(registry: dict, json_path: Path, md_path: Path) -> None:
             status = "Available" if (expiry(item) or now) > now and expiry(item) else "Expired"
             artifact = f"[{status}]({link})" if link else status
             lines.append(
-                f"| {_text(novel.get('title') or novel['url'])} | "
-                f"[URL]({novel['url']}) | {_text(item.get('range'))} | "
+                f"| [{_text(novel.get('title') or novel['url'])}]({novel['url']}) | "
+                f"{_text(item.get('range'))} | "
                 f"{item.get('chapter_count', 0)} | {artifact} | {_text(item.get('expires_at_utc'))} |"
             )
     if not registry["novels"]:
-        lines.append("| No completed downloads | | | | | |")
+        lines.append("| No completed downloads | | | | |")
     md_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
