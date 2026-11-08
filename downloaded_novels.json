@@ -74,6 +74,24 @@
       ]
     },
     {
+      "url": "https://novelfull.com/the-legendary-moonlight-sculptor.html",
+      "title": "The Legendary Moonlight Sculptor",
+      "author": "NAM Heesung",
+      "downloads": [
+        {
+          "range": "all",
+          "status": "complete",
+          "chapter_count": 710,
+          "run_id": 42494513599,
+          "run_url": "https://github.com/RichardDaffern/Novel_Library/actions/runs/42494513599",
+          "artifact_id": 13624187862,
+          "artifact_url": "https://github.com/RichardDaffern/Novel_Library/actions/runs/42494513599/artifacts/13624187862",
+          "completed_at_utc": "2026-11-08T16:03:05Z",
+          "expires_at_utc": "2026-11-15T16:03:05Z"
+        }
+      ]
+    },
+    {
       "url": "https://novelfull.com/the-world-online.html",
       "title": "The World Online",
       "author": "",
