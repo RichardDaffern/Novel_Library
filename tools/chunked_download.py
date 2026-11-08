@@ -280,7 +280,7 @@ def assembled_title(title: str, first_chunk: dict) -> str:
         return title
     first = first_chunk["start"]
     last = first_chunk["end"]
-    suffix = re.compile(rf"\\s*\\(Ch\\s*{first}\\s*-\\s*{last}\\)", flags=re.IGNORECASE)
+    suffix = re.compile(rf"\s*\(Ch\s*{first}\s*-\s*{last}\)$", flags=re.IGNORECASE)
     return (suffix.sub("", title.strip()) or title).strip()
 
 
