@@ -49,7 +49,7 @@ After uploading and validating the output, the workflow:
 3. Creates a registry/download-<run id> branch and pull request.
 4. Attempts to **squash-merge that metadata-only PR into main** automatically.
 
-For automatic PR creation and merging, the repository owner must enable **Settings > Actions > General > Workflow permissions > Allow GitHub Actions to create and approve pull requests**. The workflow token also needs contents and pull-requests write access, configured in the workflow. Branch protection requiring approvals or status checks can prevent immediate merging; an unmerged PR will remain available for review. The artifact is uploaded even if the registry PR subsequently fails.
+For automatic PR creation and merging, the repository owner must enable **Settings > Actions > General > Workflow permissions > Allow GitHub Actions to create and approve pull requests**. The workflow token also needs contents and pull-requests write access, configured in the workflow. Without the repository setting, GitHub rejects PR creation even with YAML write permissions. The chapter/EPUB artifact remains downloadable, and the metadata-only branch is retained with a manual PR link in the job summary. Branch protection requiring approvals or status checks can also prevent automatic merging.
 
 **Important:** Your repository is currently public. GitHub Actions artifacts may be accessible to other users of public repositories. Making a repository private limits exposure but does not grant permission to redistribute copyrighted content.
 
@@ -65,7 +65,7 @@ The overall bulk workflow reports failure if any novel fails; completed novels a
 
 ## Downloaded-novel list
 
-View [DOWNLOADED_NOVELS.md](DOWNLOADED_NOVELS.md) for completed downloads. The initial index includes three previously verified completed jobs. The registry is an index, **not permanent storage**: once an artifact expires, a normal rerun is allowed so the book can be archived again, subject to permission.
+View [DOWNLOADED_NOVELS.md](DOWNLOADED_NOVELS.md) for completed downloads. The index includes previously verified completed jobs, including the recovered Abe the Wizard entry from bulk run 42393126629. The registry is an index, **not permanent storage**: once an artifact expires, a normal rerun is allowed so the book can be archived again, subject to permission.
 
 ## Other tests
 

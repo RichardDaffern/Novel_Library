@@ -7,9 +7,13 @@ import tempfile
 import unittest
 import zipfile
 
+from unittest.mock import patch
+from types import SimpleNamespace
+
 from novel_downloader import epub_chapters
 from tools.chunked_download import (
-    SYNTHETIC_URL, assemble, chapter_plan, identity, validate_piece,
+    SYNTHETIC_URL, assemble, chapter_plan, chapter_count_from_metadata,
+    discover_count, identity, validate_piece,
     _epub,
 )
 
@@ -45,6 +49,34 @@ def make_piece(root: Path, url: str, key: str, first: int, last: int) -> Path:
 
 
 class ChapterBatchTests(unittest.TestCase):
+    def test_fanficfare_formatted_chapter_counts(self):
+        for value in ("4,035", "4035", 4035, " 4,035 "):
+            with self.subTest(value=value):
+                count = chapter_count_from_metadata({"numChapters": value})
+                self.assertEqual(count, 4035)
+                self.assertEqual(len(chapter_plan(URL, count)["pieces"]), 21)
+
+    def test_fallback_chapter_list_count(self):
+        self.assertEqual(
+            chapter_count_from_metadata({"zchapters": [{"url": "a"}, {"url": "b"}]}),
+            2,
+        )
+
+    def test_invalid_chapter_counts_fail_before_starting_download(self):
+        for value in ("4,03", "4,035 chapters", "unknown", "1.5", "", 0, -1, None, True):
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                chapter_count_from_metadata({"numChapters": value})
+        with self.assertRaises(ValueError):
+            chapter_count_from_metadata({})
+
+    def test_live_discovery_json_passes_formatted_count_to_planner(self):
+        with patch("tools.chunked_download.subprocess.run",
+                   return_value=SimpleNamespace(stdout='{"numChapters":"4,035"}')) as runner:
+            count = discover_count(URL)
+        self.assertEqual(count, 4035)
+        self.assertEqual(chapter_plan(URL, count)["pieces"][-1]["end"], 4035)
+        self.assertTrue(runner.call_args.kwargs["check"])
+
     def test_four_thousand_chapters_fit_in_bounded_independent_jobs(self):
         plan = chapter_plan(URL, 4035)
         self.assertEqual(len(plan["pieces"]), 21)

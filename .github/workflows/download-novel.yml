@@ -235,9 +235,15 @@ jobs:
           git add downloaded_novels.json DOWNLOADED_NOVELS.md
           git commit -m "Track completed novel archive ($GITHUB_RUN_ID)"
           git push --set-upstream origin "$BRANCH"
-          PR_URL="$(gh pr create --base main --head "$BRANCH" \
+          if ! PR_URL="$(gh pr create --base main --head "$BRANCH" \
             --title "Track completed novel download #$GITHUB_RUN_ID" \
-            --body "Only validated novel metadata is committed. The full EPUB and TXT files are in the Actions artifact.")"
+            --body "Only validated novel metadata is committed. The full EPUB and TXT files are in the Actions artifact.")"; then
+            echo "::error::Registry PR creation failed. The successfully downloaded novel artifact is still available."
+            echo "## Registry PR could not be created" >> "$GITHUB_STEP_SUMMARY"
+            echo "GitHub Actions must be allowed to create pull requests. Enable Settings > Actions > General > Workflow permissions > Allow GitHub Actions to create and approve pull requests." >> "$GITHUB_STEP_SUMMARY"
+            echo "The metadata-only branch was saved. Open a PR manually from: https://github.com/$GITHUB_REPOSITORY/compare/main...$BRANCH?expand=1" >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
           echo "Registry PR: $PR_URL" >> "$GITHUB_STEP_SUMMARY"
           gh pr merge "$PR_URL" --squash --delete-branch
           echo "Complete archive: ${{ steps.upload.outputs.artifact-url }}" >> "$GITHUB_STEP_SUMMARY"
