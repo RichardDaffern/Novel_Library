@@ -56,6 +56,24 @@
       ]
     },
     {
+      "url": "https://novelfull.com/i-am-the-monarch.html",
+      "title": "I am the Monarch",
+      "author": "Cheol Jonggeum",
+      "downloads": [
+        {
+          "range": "all",
+          "status": "complete",
+          "chapter_count": 336,
+          "run_id": 42513431015,
+          "run_url": "https://github.com/RichardDaffern/Novel_Library/actions/runs/42513431015",
+          "artifact_id": 13634498595,
+          "artifact_url": "https://github.com/RichardDaffern/Novel_Library/actions/runs/42513431015/artifacts/13634498595",
+          "completed_at_utc": "2026-11-08T21:18:11Z",
+          "expires_at_utc": "2026-11-15T21:18:11Z"
+        }
+      ]
+    },
+    {
       "url": "https://novelfull.com/i-can-track-everything.html",
       "title": "I Can Track Everything",
       "author": "",
