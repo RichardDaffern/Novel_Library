@@ -146,6 +146,24 @@
       ]
     },
     {
+      "url": "https://novelfull.com/lord-of-all-realms.html",
+      "title": "Lord of All Realms",
+      "author": "Ni Cang Tian",
+      "downloads": [
+        {
+          "range": "all",
+          "status": "complete",
+          "chapter_count": 1823,
+          "run_id": 42513414021,
+          "run_url": "https://github.com/RichardDaffern/Novel_Library/actions/runs/42513414021",
+          "artifact_id": 13636640990,
+          "artifact_url": "https://github.com/RichardDaffern/Novel_Library/actions/runs/42513414021/artifacts/13636640990",
+          "completed_at_utc": "2026-11-08T22:12:32Z",
+          "expires_at_utc": "2026-11-15T22:12:32Z"
+        }
+      ]
+    },
+    {
       "url": "https://novelfull.com/lord-of-the-world-i-become-the-lord-of-the-desert-from-the-start.html",
       "title": "Lord Of The World: I Become The Lord Of The Desert From The Start",
       "author": "Carp Blowing Bubbles",
