@@ -146,6 +146,24 @@
       ]
     },
     {
+      "url": "https://novelfull.com/true-martial-world.html",
+      "title": "True Martial World",
+      "author": "Cocooned Cow",
+      "downloads": [
+        {
+          "range": "all",
+          "status": "complete",
+          "chapter_count": 1710,
+          "run_id": 42494499443,
+          "run_url": "https://github.com/RichardDaffern/Novel_Library/actions/runs/42494499443",
+          "artifact_id": 13625147182,
+          "artifact_url": "https://github.com/RichardDaffern/Novel_Library/actions/runs/42494499443/artifacts/13625147182",
+          "completed_at_utc": "2026-11-08T16:29:28Z",
+          "expires_at_utc": "2026-11-15T16:29:28Z"
+        }
+      ]
+    },
+    {
       "url": "https://novelfull.com/very-pure-and-ambiguous-the-prequel.html",
       "title": "Very Pure and Ambiguous: The Prequel",
       "author": "Fishman The Second",
