@@ -35,6 +35,17 @@ def identity(url: str) -> str:
     return sha256(url.encode("utf-8")).hexdigest()[:20]
 
 
+def choose_parallelism(selected_chapters: int, batch_count: int) -> int:
+    """Scale to one additional worker per 600 selected chapters, capped at six.
+
+    Never launch more workers than complete chapter batches, even for a large
+    selected range and unusually large batch sizes.
+    """
+    if selected_chapters < 1 or batch_count < 1:
+        raise ValueError("Selected chapters and chapter batches must be positive")
+    return min(6, batch_count, max(1, (selected_chapters + 599) // 600))
+
+
 def chapter_plan(url: str, total: int, chapter_range: str = "",
                  chunk_size: int = DEFAULT_CHUNK_SIZE) -> dict:
     if not isinstance(total, int) or total < 1:
@@ -55,6 +66,7 @@ def chapter_plan(url: str, total: int, chapter_range: str = "",
     return {
         "version": 1, "url": url, "key": key, "range": selected,
         "total_chapters": total, "first": first, "last": last, "pieces": pieces,
+        "parallelism": choose_parallelism(last - first + 1, len(pieces)),
     }
 
 
@@ -357,7 +369,9 @@ def main(argv: list[str] | None = None) -> int:
         for field in ("key", "first", "last"):
             _github_output(field, str(plan[field]))
         _github_output("matrix", matrix)
-        print(f"INDEXED {total} chapters: {len(plan['pieces'])} batches for {plan['first']}-{plan['last']}", flush=True)
+        _github_output("parallelism", str(plan["parallelism"]))
+        print(f"INDEXED {total} chapters: {len(plan['pieces'])} batches for {plan['first']}-{plan['last']}; "
+              f"up to {plan['parallelism']} parallel chapter jobs", flush=True)
         return 0
     if args.action == "fetch":
         fetch_piece(url, args.key, args.start, args.end, args.output_dir,
