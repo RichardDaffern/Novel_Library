@@ -12,6 +12,7 @@ from datetime import datetime, timezone
 from hashlib import sha256
 from html import escape
 import json
+import re
 import os
 from pathlib import Path
 import shutil
@@ -64,18 +65,38 @@ def _github_output(name: str, value: str) -> None:
             file.write(f"{name}={value}\n")
 
 
+def chapter_count_from_metadata(data: dict) -> int:
+    """Accept FanFicFare counts such as 4035, "4035", or "4,035".
+
+    Validate the entire numeric value instead of silently truncating a malformed
+    chapter count, as doing so would produce incomplete output.
+    """
+    count = data.get("numChapters")
+    if count is None:
+        chapters = data.get("zchapters")
+        if not isinstance(chapters, list):
+            raise ValueError("FanFicFare metadata has no chapter count or chapter list")
+        count = len(chapters)
+    elif isinstance(count, str):
+        raw = count.strip()
+        if not re.fullmatch(r"(?:[0-9]{1,3}(?:,[0-9]{3})+|[0-9]+)", raw):
+            raise ValueError(f"Invalid FanFicFare chapter count: {count!r}")
+        count = int(raw.replace(",", ""))
+    elif type(count) is not int:
+        raise ValueError(f"Invalid FanFicFare chapter count type: {type(count).__name__}")
+    if count < 1:
+        raise ValueError(f"FanFicFare returned no chapters: {count}")
+    return count
+
+
 def discover_count(url: str, timeout_minutes: int = 15) -> int:
     completed = subprocess.run(
         [sys.executable, "novel_downloader.py", url, "--confirm-rights", "--list-only",
          "--timeout-minutes", str(timeout_minutes)],
         capture_output=True, text=True, check=True, timeout=timeout_minutes * 60 + 30,
     )
-    # FanFicFare --json-meta outputs a JSON object; fail loudly if site indexing fails.
     data = json.loads(completed.stdout.strip())
-    count = data.get("numChapters")
-    if count is None:
-        count = len(data.get("zchapters", []))
-    return int(count)
+    return chapter_count_from_metadata(data)
 
 
 def _manifest_file(folder: Path) -> Path:
