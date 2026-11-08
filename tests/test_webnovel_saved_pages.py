@@ -145,5 +145,32 @@ class SavedPagesTests(unittest.TestCase):
             self.assertTrue((root / "out" / "book.epub").exists())
 
 
+    def test_saved_pages_with_site_wide_unlock_banner_still_export(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            p1, p2 = self._fixtures(root)
+            p1.write_text(
+                "<html><body><nav>Unlock this chapter</nav>" +
+                FIRST + "<footer>Premium chapter offers</footer></body></html>",
+                encoding="utf-8",
+            )
+            p2.write_text(
+                "<html><header>Subscribe to unlock more chapters</header>" +
+                SECOND + "</html>",
+                encoding="utf-8",
+            )
+            out = root / "out"
+            result = import_saved_pages(
+                "Original book", "Invented writer", [p1, p2],
+                ["One", "Two"], out, confirm_rights=True,
+            )
+            self.assertEqual(result["chapter_count"], 2)
+            content = (out / "book.txt").read_text(encoding="utf-8")
+            self.assertIn("Original chapter one passage", content)
+            self.assertIn("Original second chapter", content)
+            self.assertNotIn("Premium chapter offers", content)
+            self.assertNotIn("Subscribe to unlock", content)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -75,11 +75,17 @@ def public_first_two_links(book_html, book_url):
     return found
 
 
+def _contains_lock_notice(text):
+    """Look for a paywall notice in the candidate chapter body, not site chrome."""
+    lowered = text.lower()
+    return any(marker in lowered for marker in LOCK_MARKERS)
+
+
 def parse_public_chapter(html, chapter_url, expected_title):
     soup = BeautifulSoup(html, "html.parser")
-    visible = soup.get_text(" ", strip=True)
-    if any(marker in visible.lower() for marker in LOCK_MARKERS):
-        raise PublicChapterError("Page may contain locked content; stopped without exporting")
+    # WebNovel's general navigation and dialogs can mention locked chapters
+    # even when the current chapter is freely readable. Checking the entire
+    # page first misclassifies those saved HTML files as locked.
     for selector in CONTENT_SELECTORS:
         node = soup.select_one(selector)
         if node:
@@ -89,8 +95,14 @@ def parse_public_chapter(html, chapter_url, expected_title):
             text = "\n\n".join(p for p in paragraphs if p)
             if not text:
                 text = node.get_text("\n", strip=True)
+            if _contains_lock_notice(text):
+                raise PublicChapterError("Page may contain locked content; stopped without exporting")
             if len(text) >= 100:
                 return text
+    # If no readable body was found, preserve the explicit locked-content error
+    # when the only visible information is an unlock notice.
+    if _contains_lock_notice(soup.get_text(" ", strip=True)):
+        raise PublicChapterError("Page may contain locked content; stopped without exporting")
     raise PublicChapterError("Public chapter body selector not confirmed; no export attempted")
 
 
