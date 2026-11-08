@@ -29,12 +29,32 @@ class FakeResponse:
         self.headers = headers or {}
 
 
+class FakeTab:
+    def __init__(self, page):
+        self.page = page
+
+    def click(self, **options):
+        if self.page.toc is None:
+            raise RuntimeError("Table of Contents cannot be opened")
+        self.page.clicked.append("Table of Contents")
+        self.page._current = self.page.toc
+
+
 class FakePage:
     def __init__(self, pages):
         self.pages = pages
+        self.toc = pages.get("_toc_html")
         self.url = ""
         self.visited = []
         self.waits = []
+        self.clicked = []
+
+    def get_by_text(self, label, exact=False):
+        if label != "Table of Contents" or not exact:
+            raise RuntimeError("Unknown tab")
+        if "Table of Contents" not in (self._current or ""):
+            raise RuntimeError("Table of Contents tab not present")
+        return FakeTab(self)
 
     def goto(self, url, **options):
         self.url = url
@@ -204,10 +224,64 @@ class BrowserTests(unittest.TestCase):
             self.assertEqual(result['chapter_count'], 2)
             self.assertEqual(chromium.browser.context.page.visited, [BOOK, CH1, CH2])
 
+    def test_about_tab_then_table_of_contents_reveals_real_shape_links(self):
+        # Reproduces the user's video: initial About panel, clickable TOC tab,
+        # then numbered chapter links and a latest-release link above them.
+        first = "https://www.webnovel.com/book/33422293300201205/89735050081387238"
+        second = "https://www.webnovel.com/book/33422293300201205/89735050081387259"
+        about = '<html><div>About | Table of Contents</div><p>Synopsis</p></html>'
+        toc = (
+            '<html><h2>Table of Contents</h2>'
+            '<a href="/book/33422293300201205/89735050081389999">'
+            'Chapter 884: The final announcement</a>'
+            f'<a href="{second}">Chapter 2: A Different Draco</a>'
+            f'<a href="{first}">Chapter 1: On the Hogwarts Express</a>'
+            '</html>'
+        )
+        chromium = FakeChromium({
+            BOOK: about, "_toc_html": toc,
+            first: BODY1, second: BODY2,
+        })
+        with TemporaryDirectory() as tmp:
+            out = Path(tmp) / "out"
+            result = browser_probe(
+                BOOK, out, "Example novel", "Example author",
+                confirm_rights=True, chromium=chromium,
+            )
+            page = chromium.browser.context.page
+            self.assertEqual(page.clicked, ["Table of Contents"])
+            self.assertEqual(page.visited, [BOOK, first, second])
+            self.assertEqual(result["chapters"][0]["title"], "Chapter 1: On the Hogwarts Express")
+            self.assertEqual(result["chapters"][1]["title"], "Chapter 2: A Different Draco")
+            self.assertEqual(result["chapter_count"], 2)
+
+    def test_unavailable_table_of_contents_fails_without_chapter_navigation(self):
+        chromium = FakeChromium({BOOK: '<html><div>About | Table of Contents</div></html>'})
+        with TemporaryDirectory() as tmp:
+            out = Path(tmp) / "out"
+            with self.assertRaisesRegex(BrowserProbeError, "could not be opened"):
+                browser_probe(BOOK, out, "Novel", "Author",
+                              confirm_rights=True, chromium=chromium)
+            self.assertEqual(chromium.browser.context.page.visited, [BOOK])
+            self.assertFalse(out.exists())
+
+    def test_toc_with_no_chapters_fails_without_chapter_navigation(self):
+        chromium = FakeChromium({
+            BOOK: '<html><div>About | Table of Contents</div></html>',
+            "_toc_html": '<html><h2>Table of Contents</h2><p>No chapter entries available</p></html>',
+        })
+        with TemporaryDirectory() as tmp:
+            out = Path(tmp) / "out"
+            with self.assertRaisesRegex(BrowserProbeError, "not found"):
+                browser_probe(BOOK, out, "Novel", "Author",
+                              confirm_rights=True, chromium=chromium)
+            self.assertEqual(chromium.browser.context.page.visited, [BOOK])
+            self.assertFalse(out.exists())
+
     def test_catalogue_without_links_fails_closed(self):
         chromium = FakeChromium({BOOK: '<html>Book with hidden catalogue</html>'})
         with TemporaryDirectory() as tmp:
-            with self.assertRaisesRegex(BrowserProbeError, 'Could not find'):
+            with self.assertRaisesRegex(BrowserProbeError, 'could not be opened'):
                 browser_probe(BOOK, Path(tmp) / 'out', 'A', 'B',
                               confirm_rights=True, chromium=chromium)
 

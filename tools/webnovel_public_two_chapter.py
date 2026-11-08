@@ -51,28 +51,27 @@ def public_first_two_links(book_html, book_url):
     book_url = validate_book_url(book_url)
     book_id = book_url.rsplit("_", 1)[-1].rsplit("/", 1)[-1]
     soup = BeautifulSoup(book_html, "html.parser")
-    found = []
-    seen = set()
+    # The catalogue displays a "Latest Release" chapter link above its table
+    # of contents; do not take the first two links in document order. Instead
+    # identify *exactly* Chapters 1 and 2 by their visible numbered labels.
+    found = {}
     for a in soup.find_all("a", href=True):
         link = urljoin(book_url, a["href"])
         try:
             checked = _chapter_url(link, book_id)
         except PublicChapterError:
             continue
-        if checked in seen:
-            continue
         label = a.get_text(" ", strip=True)
-        if not re.search(r"\b(?:chapter\s*)?\d+\b", label, flags=re.I):
+        number_match = re.match(r"^\s*(?:\d+\s+)?chapter\s*([12])\b", label, flags=re.I)
+        if not number_match:
             continue
-        seen.add(checked)
-        found.append((checked, label))
-        if len(found) == 2:
-            break
-    if len(found) != 2:
+        number = int(number_match.group(1))
+        if number in found and found[number][0] != checked:
+            raise PublicChapterError(f"Conflicting URLs for Chapter {number} in public catalogue")
+        found[number] = (checked, label)
+    if set(found) != {1, 2} or found[1][0] == found[2][0]:
         raise PublicChapterError("Two public chapter links not present in static book HTML")
-    if not re.search(r"\b1\b", found[0][1]) or not re.search(r"\b2\b", found[1][1]):
-        raise PublicChapterError("First two chapter numbers were not confirmed in order")
-    return found
+    return [found[1], found[2]]
 
 
 def _contains_lock_notice(text):

@@ -30,6 +30,31 @@ class PublicTwoChapterTests(unittest.TestCase):
         links = public_first_two_links(BOOK_HTML, BOOK)
         self.assertEqual([u for u, _ in links], [CH1, CH2])
 
+
+    def test_real_video_link_shape_and_latest_release_before_first_chapter(self):
+        # The user's recording shows /book/<book-id>/<chapter-id> links and a
+        # "Latest Release" link before the two first chapters.
+        first = "https://www.webnovel.com/book/33422293300201205/89735050081387238"
+        second = "https://www.webnovel.com/book/33422293300201205/89735050081387259"
+        html = f"""<html><div>Table of Contents</div>
+        <a href="/book/33422293300201205/89999999999999999">Chapter 884: Ending</a>
+        <a href="{second}">Chapter 2: A Different Draco</a>
+        <a href="{first}">Chapter 1: On the Hogwarts Express</a>
+        </html>"""
+        found = public_first_two_links(html, BOOK)
+        self.assertEqual(found, [
+            (first, "Chapter 1: On the Hogwarts Express"),
+            (second, "Chapter 2: A Different Draco"),
+        ])
+
+    def test_ambiguous_chapter_one_links_fail_closed(self):
+        html = f"""<html>
+        <a href="{CH1}">Chapter 1: Beginning</a>
+        <a href="/book/33422293300201205/99999999999999">Chapter 1: Other</a>
+        <a href="{CH2}">Chapter 2: Next</a></html>"""
+        with self.assertRaisesRegex(PublicChapterError, "Conflicting URLs"):
+            public_first_two_links(html, BOOK)
+
     def test_rejects_other_domains_books_and_queries(self):
         for url in (
             CH1.replace("www.webnovel.com", "webnovel.com.evil.test"),
