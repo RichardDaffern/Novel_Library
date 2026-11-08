@@ -247,6 +247,24 @@
       ]
     },
     {
+      "url": "https://novelfull.com/transcending-the-nine-heavens.html",
+      "title": "Transcending the Nine Heavens",
+      "author": "Fengling Tianxia",
+      "downloads": [
+        {
+          "range": "all",
+          "status": "complete",
+          "chapter_count": 1510,
+          "run_id": 42494513599,
+          "run_url": "https://github.com/RichardDaffern/Novel_Library/actions/runs/42494513599",
+          "artifact_id": 13629491257,
+          "artifact_url": "https://github.com/RichardDaffern/Novel_Library/actions/runs/42494513599/artifacts/13629491257",
+          "completed_at_utc": "2026-11-08T18:34:37Z",
+          "expires_at_utc": "2026-11-15T18:34:37Z"
+        }
+      ]
+    },
+    {
       "url": "https://novelfull.com/tranxending-vision.html",
       "title": "TranXending Vision",
       "author": "Li Xianyu",
