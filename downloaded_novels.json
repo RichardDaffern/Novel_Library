@@ -92,6 +92,24 @@
       ]
     },
     {
+      "url": "https://novelfull.com/god-emperor.html",
+      "title": "God Emperor",
+      "author": "Flying Fish",
+      "downloads": [
+        {
+          "range": "all",
+          "status": "complete",
+          "chapter_count": 2622,
+          "run_id": 42513447856,
+          "run_url": "https://github.com/RichardDaffern/Novel_Library/actions/runs/42513447856",
+          "artifact_id": 13636968626,
+          "artifact_url": "https://github.com/RichardDaffern/Novel_Library/actions/runs/42513447856/artifacts/13636968626",
+          "completed_at_utc": "2026-11-08T22:32:56Z",
+          "expires_at_utc": "2026-11-15T22:32:56Z"
+        }
+      ]
+    },
+    {
       "url": "https://novelfull.com/i-alone-level-up.html",
       "title": "I Alone Level-Up",
       "author": "Chugong",
