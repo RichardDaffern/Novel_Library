@@ -44,9 +44,16 @@ python -m tools.webnovel_browser_probe "https://www.webnovel.com/book/3342229330
 ~~~
 
 By default a regular visible Chromium window opens. The browser will request
-the book page, then chapters 1 and 2 only if both public links are found.
-If the site serves an access challenge, redirects the browser, or does not
-expose readable chapter text, no export is performed.
+the book page and inspect its initial HTML. If Chapters 1 and 2 are not found,
+it will **click the visible "Table of Contents" tab**, which your November 9
+screen recording showed beside "About", and wait briefly for the chapter
+links to render. It selects the actual Chapter 1 and Chapter 2 by their
+visible labels, ignoring the "Latest Release" link near the top. The link
+shape shown in your video is /book/<book-id>/<chapter-id>.
+
+Only the first two public chapter pages will then be visited. If the site
+serves an access challenge, redirects the browser, or does not expose
+readable chapter text, no export is performed.
 
 If chapter links are not present in the book page's rendered HTML, you can
 supply both publicly visible links copied from the site's chapter navigation
