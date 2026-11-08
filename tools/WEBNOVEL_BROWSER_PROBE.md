@@ -61,8 +61,16 @@ book.epub and metadata.json. Do not upload story text to GitHub.
 - **Success:** We have confirmed a normal browser can read these two public
   pages on the device running the test. After checking the resulting EPUB,
   we can build resumable chapter-range downloading on the same supported path.
-- **Cloudflare/HTTP 403:** Browser-based unattended retrieval is also blocked
-  in this environment. We will not implement evasion of that restriction.
+- **Confirmed Cloudflare challenge:** The probe checks Cloudflare's documented
+  `cf-mitigated: challenge` response header and recognises actual challenge
+  page titles or verification-only pages. It stops immediately without trying
+  to solve or bypass a challenge.
+- **HTTP 403:** Browser-based unattended retrieval is refused in this
+  environment. We will not implement evasion of that restriction.
+- **HTML contains Cloudflare script names:** Unlike the original probe, the
+  updated detector does not assume that a page is blocked merely because a
+  site's HTML includes challenge-related JavaScript. Only a true challenge
+  signal blocks retrieval.
 - **Chapter links absent:** The book catalogue may use an interactive or
   changed layout. Provide the two normal chapter URLs to separate chapter-link
   discovery from the access check.
