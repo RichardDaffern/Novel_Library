@@ -128,6 +128,24 @@
       ]
     },
     {
+      "url": "https://novelfull.com/the-second-coming-of-gluttony.html",
+      "title": "The Second Coming of Gluttony",
+      "author": "Ro Yu-jin",
+      "downloads": [
+        {
+          "range": "all",
+          "status": "complete",
+          "chapter_count": 550,
+          "run_id": 42494513599,
+          "run_url": "https://github.com/RichardDaffern/Novel_Library/actions/runs/42494513599",
+          "artifact_id": 13626140911,
+          "artifact_url": "https://github.com/RichardDaffern/Novel_Library/actions/runs/42494513599/artifacts/13626140911",
+          "completed_at_utc": "2026-11-08T16:56:44Z",
+          "expires_at_utc": "2026-11-15T16:56:44Z"
+        }
+      ]
+    },
+    {
       "url": "https://novelfull.com/the-world-online.html",
       "title": "The World Online",
       "author": "",
