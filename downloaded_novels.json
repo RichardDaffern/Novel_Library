@@ -92,6 +92,24 @@
       ]
     },
     {
+      "url": "https://novelfull.com/the-lords-empire.html",
+      "title": "The Lord’s Empire",
+      "author": "Shen Tianyi",
+      "downloads": [
+        {
+          "range": "all",
+          "status": "complete",
+          "chapter_count": 1729,
+          "run_id": 42494513599,
+          "run_url": "https://github.com/RichardDaffern/Novel_Library/actions/runs/42494513599",
+          "artifact_id": 13625076323,
+          "artifact_url": "https://github.com/RichardDaffern/Novel_Library/actions/runs/42494513599/artifacts/13625076323",
+          "completed_at_utc": "2026-11-08T16:28:03Z",
+          "expires_at_utc": "2026-11-15T16:28:03Z"
+        }
+      ]
+    },
+    {
       "url": "https://novelfull.com/the-ocean-lord-is-unusually-powerful.html",
       "title": "The Ocean Lord Is Unusually Powerful",
       "author": "Chenyu The Herder",
