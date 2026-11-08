@@ -247,6 +247,24 @@
       ]
     },
     {
+      "url": "https://novelfull.com/tranxending-vision.html",
+      "title": "TranXending Vision",
+      "author": "Li Xianyu",
+      "downloads": [
+        {
+          "range": "all",
+          "status": "complete",
+          "chapter_count": 1201,
+          "run_id": 42494513599,
+          "run_url": "https://github.com/RichardDaffern/Novel_Library/actions/runs/42494513599",
+          "artifact_id": 13629356718,
+          "artifact_url": "https://github.com/RichardDaffern/Novel_Library/actions/runs/42494513599/artifacts/13629356718",
+          "completed_at_utc": "2026-11-08T18:34:08Z",
+          "expires_at_utc": "2026-11-15T18:34:08Z"
+        }
+      ]
+    },
+    {
       "url": "https://novelfull.com/true-martial-world.html",
       "title": "True Martial World",
       "author": "Cocooned Cow",
