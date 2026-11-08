@@ -148,7 +148,7 @@
     {
       "url": "https://novelfull.com/the-world-online.html",
       "title": "The World Online",
-      "author": "",
+      "author": "Sheng Xiao Jian Ke",
       "downloads": [
         {
           "range": "all",
@@ -160,6 +160,17 @@
           "artifact_url": "https://github.com/RichardDaffern/Novel_Library/actions/runs/42368375482/artifacts/13575943777",
           "completed_at_utc": "2026-11-07T13:31:08Z",
           "expires_at_utc": "2026-11-14T13:31:01Z"
+        },
+        {
+          "range": "all",
+          "status": "complete",
+          "chapter_count": 1356,
+          "run_id": 42494513599,
+          "run_url": "https://github.com/RichardDaffern/Novel_Library/actions/runs/42494513599",
+          "artifact_id": 13627465520,
+          "artifact_url": "https://github.com/RichardDaffern/Novel_Library/actions/runs/42494513599/artifacts/13627465520",
+          "completed_at_utc": "2026-11-08T17:27:24Z",
+          "expires_at_utc": "2026-11-15T17:27:24Z"
         }
       ]
     },
