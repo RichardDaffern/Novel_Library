@@ -1,0 +1,51 @@
+name: WebNovel temporary two-chapter live feasibility
+
+on:
+  push:
+    branches:
+      - test/webnovel-live-two-chapters
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  webnovel-public-two-chapter:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install existing parser dependencies
+        run: python -m pip install "beautifulsoup4>=4.12,<5"
+      - name: Run public two-chapter probe without publishing chapter contents
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from tempfile import TemporaryDirectory
+          from zipfile import ZipFile
+          from tools.webnovel_public_two_chapter import probe_two_chapters
+
+          book = "https://www.webnovel.com/book/33422293300201205"
+          try:
+              with TemporaryDirectory() as temp:
+                  output = Path(temp) / "out"
+                  result = probe_two_chapters(book, output, confirm_rights=True)
+                  assert result["chapter_count"] == 2
+                  assert [c["position"] for c in result["chapters"]] == [1, 2]
+                  for chapter in result["chapters"]:
+                      filename = output / chapter["file"]
+                      assert filename.is_file() and filename.stat().st_size > 100
+                  with ZipFile(output / "book.epub") as epub:
+                      assert epub.testzip() is None
+                      assert len([n for n in epub.namelist() if n.endswith(".xhtml")]) == 2
+                  assert (output / "book.txt").is_file()
+                  print("PASS: two public chapters, ordered TXT files, EPUB archive, metadata")
+          except Exception as exc:
+              print(f"FAIL: {type(exc).__name__}: {exc}")
+              raise SystemExit(1)
+          PY
