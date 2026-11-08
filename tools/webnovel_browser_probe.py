@@ -14,6 +14,8 @@ import json
 from pathlib import Path
 import sys
 
+from bs4 import BeautifulSoup
+
 from tools.webnovel_export import ExportError, export
 from tools.webnovel_probe import validate_book_url
 from tools.webnovel_public_two_chapter import (
@@ -25,15 +27,12 @@ from tools.webnovel_public_two_chapter import (
 
 PAGE_TIMEOUT_MS = 30000
 PAGE_SETTLE_MS = 1800
-CHALLENGE_MARKERS = (
-    "cf-challenge",
-    "cf_chl_",
-    "challenge-platform",
-    "verify you are human",
-    "checking your browser",
-    "just a moment...",
-    "attention required! | cloudflare",
-)
+# Cloudflare's documented challenge signal is the cf-mitigated header.
+# Treat actual challenge page titles and a challenge-only body as fallbacks.
+# Do NOT search all HTML markup for script names: genuine pages may contain
+# challenge-related JS references without being challenge pages.
+CHALLENGE_TITLES = ("just a moment...", "attention required! | cloudflare")
+VISIBLE_CHALLENGE_TEXT = ("verify you are human", "checking your browser")
 
 
 class BrowserProbeError(ValueError):
@@ -47,6 +46,14 @@ def _checked_page(page, url: str) -> str:
         raise BrowserProbeError(f"Browser navigation failed: {exc}") from exc
     if response is None:
         raise BrowserProbeError("Browser navigation did not return an HTTP response")
+    # https://developers.cloudflare.com/cloudflare-challenges/challenge-types/challenge-pages/detect-response/
+    # This exact header distinguishes a real Cloudflare challenge response
+    # from unrelated challenge-related strings in legitimate page scripts.
+    if response.headers.get("cf-mitigated", "").lower() == "challenge":
+        raise BrowserProbeError(
+            "Confirmed Cloudflare challenge (cf-mitigated response header); "
+            "stopped without bypassing it"
+        )
     status = response.status
     if status >= 400:
         raise BrowserProbeError(f"Site returned HTTP {status}; no further request attempted")
@@ -55,11 +62,29 @@ def _checked_page(page, url: str) -> str:
         raise BrowserProbeError("Page redirected away from requested public URL")
     page.wait_for_timeout(PAGE_SETTLE_MS)
     html = page.content()
-    # Inspect the page markup for known Cloudflare challenge pages. Never
-    # solve challenges or continue past them as part of the automation.
-    lower = html.lower()
-    if any(marker in lower for marker in CHALLENGE_MARKERS):
-        raise BrowserProbeError("Site access challenge detected; stopped without bypassing it")
+    soup = BeautifulSoup(html, "html.parser")
+    page_title = soup.title.get_text(" ", strip=True).lower() if soup.title else ""
+    if any(marker in page_title for marker in CHALLENGE_TITLES):
+        raise BrowserProbeError(
+            "Browser displayed a Cloudflare challenge page title; "
+            "stopped without bypassing it"
+        )
+    # Also reject a challenge-only page if the response header is absent,
+    # without classifying ordinary pages with embedded challenge JS as blocked.
+    visible = soup.get_text(" ", strip=True).lower()
+    has_readable_structure = bool(
+        soup.select_one(
+            "div.cha-content, div.chapter-content, div#chapter-content, "
+            "div.chapter_content, div#chapterContent, article.chapter-content"
+        )
+    )
+    has_book_links = bool(soup.select_one('a[href*="/book/"]'))
+    if not (has_readable_structure or has_book_links):
+        if any(phrase in visible for phrase in VISIBLE_CHALLENGE_TEXT):
+            raise BrowserProbeError(
+                "Browser displayed a human-verification challenge without book/chapter content; "
+                "stopped without bypassing it"
+            )
     return html
 
 

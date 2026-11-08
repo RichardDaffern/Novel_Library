@@ -24,8 +24,9 @@ BODY2 = """<html><div class="cha-content"><p>Original chapter two begins
 
 
 class FakeResponse:
-    def __init__(self, status=200):
+    def __init__(self, status=200, headers=None):
         self.status = status
+        self.headers = headers or {}
 
 
 class FakePage:
@@ -42,11 +43,11 @@ class FakePage:
         if isinstance(value, Exception):
             raise value
         if isinstance(value, tuple):
-            html, status, redirect = value
+            html, status, redirect, *extra = value
             if redirect:
                 self.url = redirect
             self._current = html
-            return FakeResponse(status)
+            return FakeResponse(status, extra[0] if extra else None)
         self._current = value
         return FakeResponse() if value is not None else None
 
@@ -126,6 +127,45 @@ class BrowserTests(unittest.TestCase):
             self.assertEqual(chromium.browser.context.page.visited, [BOOK])
             self.assertFalse(out.exists())
             self.assertTrue(chromium.browser.closed)
+
+    def test_cf_mitigated_challenge_header_always_stops(self):
+        chromium = FakeChromium({
+            BOOK: (CATALOG, 200, None, {"cf-mitigated": "challenge"})
+        })
+        with TemporaryDirectory() as tmp:
+            out = Path(tmp) / 'out'
+            with self.assertRaisesRegex(BrowserProbeError, 'cf-mitigated'):
+                browser_probe(BOOK, out, 'A', 'B',
+                              confirm_rights=True, chromium=chromium)
+            self.assertEqual(chromium.browser.context.page.visited, [BOOK])
+            self.assertFalse(out.exists())
+
+    def test_unrelated_challenge_script_strings_do_not_block_real_pages(self):
+        script = ('<script>window.cf_chl_opt = "cf-challenge"; '
+                  'var scriptPath = "challenge-platform";</script>')
+        chromium = FakeChromium({
+            BOOK: CATALOG + script,
+            CH1: BODY1 + script,
+            CH2: BODY2 + script,
+        })
+        with TemporaryDirectory() as tmp:
+            out = Path(tmp) / 'out'
+            result = browser_probe(BOOK, out, 'Original story', 'Author',
+                                   confirm_rights=True, chromium=chromium)
+            self.assertEqual(result['chapter_count'], 2)
+            self.assertEqual(chromium.browser.context.page.visited, [BOOK, CH1, CH2])
+
+    def test_challenge_only_visible_page_stops_without_header(self):
+        chromium = FakeChromium({
+            BOOK: ('<html><body><p>Verify you are human to continue</p></body></html>', 200, None)
+        })
+        with TemporaryDirectory() as tmp:
+            out = Path(tmp) / 'out'
+            with self.assertRaisesRegex(BrowserProbeError, 'human-verification challenge'):
+                browser_probe(BOOK, out, 'A', 'B',
+                              confirm_rights=True, chromium=chromium)
+            self.assertEqual(chromium.browser.context.page.visited, [BOOK])
+            self.assertFalse(out.exists())
 
     def test_http_403_does_not_retry(self):
         chromium = FakeChromium({BOOK: ('<html>access denied</html>', 403, None)})
