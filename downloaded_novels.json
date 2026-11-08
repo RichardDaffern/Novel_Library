@@ -211,6 +211,24 @@
       ]
     },
     {
+      "url": "https://novelfull.com/throne-of-magical-arcana.html",
+      "title": "Throne of Magical Arcana",
+      "author": "Cuttlefish That Loves Diving",
+      "downloads": [
+        {
+          "range": "all",
+          "status": "complete",
+          "chapter_count": 910,
+          "run_id": 42494513599,
+          "run_url": "https://github.com/RichardDaffern/Novel_Library/actions/runs/42494513599",
+          "artifact_id": 13627324316,
+          "artifact_url": "https://github.com/RichardDaffern/Novel_Library/actions/runs/42494513599/artifacts/13627324316",
+          "completed_at_utc": "2026-11-08T17:49:19Z",
+          "expires_at_utc": "2026-11-15T17:49:19Z"
+        }
+      ]
+    },
+    {
       "url": "https://novelfull.com/true-martial-world.html",
       "title": "True Martial World",
       "author": "Cocooned Cow",
