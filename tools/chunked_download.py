@@ -269,6 +269,21 @@ def _epub(book: Path, rows: list[dict], title: str, author: str, language: str, 
             z.writestr(f"OEBPS/chap{i:06d}.xhtml", chapter_xhtml(row))
 
 
+def assembled_title(title: str, first_chunk: dict) -> str:
+    """Remove the chapter-range suffix introduced by FanFicFare's range export.
+
+    The title of a chapter-range EPUB may be, for example,
+    "Novel Name (Ch 1-200)". The assembled book must carry the novel's name,
+    not the label of the first 200-chapter intermediate file.
+    """
+    if not title:
+        return title
+    first = first_chunk["start"]
+    last = first_chunk["end"]
+    suffix = re.compile(rf"\s*\(Ch\s*{first}\s*-\s*{last}\)$", flags=re.IGNORECASE)
+    return (suffix.sub("", title.strip()) or title).strip()
+
+
 def assemble(plan: dict, chunks_dir: Path, output_dir: Path) -> Path:
     key, url = plan["key"], plan["url"]
     if key != identity(url):
@@ -295,7 +310,7 @@ def assemble(plan: dict, chunks_dir: Path, output_dir: Path) -> Path:
             raise ValueError(f"Failed to verify combined chapter {row['position']}")
         merged.append({k: v for k, v in row.items() if k != "_source"} | {"file": dest})
     first_metadata = titles[0]
-    title = first_metadata.get("title") or book.name
+    title = assembled_title(first_metadata.get("title") or book.name, plan["pieces"][0])
     author = first_metadata.get("author") or ""
     language = first_metadata.get("language") or "en"
     _epub(book, merged, title, author, language, url)

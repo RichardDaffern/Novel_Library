@@ -12,7 +12,7 @@ from types import SimpleNamespace
 
 from novel_downloader import epub_chapters
 from tools.chunked_download import (
-    SYNTHETIC_URL, assemble, chapter_plan, chapter_count_from_metadata,
+    SYNTHETIC_URL, assemble, assembled_title, chapter_plan, chapter_count_from_metadata,
     discover_count, identity, validate_piece,
     _epub,
 )
@@ -49,6 +49,39 @@ def make_piece(root: Path, url: str, key: str, first: int, last: int) -> Path:
 
 
 class ChapterBatchTests(unittest.TestCase):
+    def test_assembled_title_ignores_first_batch_range_suffix(self):
+        self.assertEqual(
+            assembled_title("Chaotic Sword God (Ch 1-200)", {"start": 1, "end": 200}),
+            "Chaotic Sword God",
+        )
+        self.assertEqual(
+            assembled_title("Long Story (Ch 251-450)", {"start": 251, "end": 450}),
+            "Long Story",
+        )
+        self.assertEqual(
+            assembled_title("Legitimate (Ch 1-200) Subtitle", {"start": 1, "end": 200}),
+            "Legitimate (Ch 1-200) Subtitle",
+        )
+
+    def test_assembled_epub_and_metadata_use_full_title(self):
+        plan = chapter_plan(URL, 4, "1-4", chunk_size=2)
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            parts = root / "parts"
+            first = make_piece(parts, URL, plan["key"], 1, 2)
+            make_piece(parts, URL, plan["key"], 3, 4)
+            metadata_file = first / "book" / "metadata.json"
+            metadata = json.loads(metadata_file.read_text(encoding="utf-8"))
+            metadata["title"] += " (Ch 1-2)"
+            metadata_file.write_text(json.dumps(metadata), encoding="utf-8")
+            book = assemble(plan, parts, root / "downloads")
+            self.assertEqual(
+                json.loads((book / "metadata.json").read_text(encoding="utf-8"))["title"],
+                "A Synthetic Very Long Story",
+            )
+            epub_meta, _ = epub_chapters(book / "source.epub")
+            self.assertEqual(epub_meta["title"], "A Synthetic Very Long Story")
+
     def test_fanficfare_formatted_chapter_counts(self):
         for value in ("4,035", "4035", 4035, " 4,035 "):
             with self.subTest(value=value):
