@@ -93,8 +93,8 @@
     },
     {
       "url": "https://novelfull.com/she-is-from-the-countryside.html",
-      "title": "She Is From the Countryside",
-      "author": "",
+      "title": "She Is From The Countryside",
+      "author": "Zi Xuan",
       "downloads": [
         {
           "range": "all",
@@ -106,6 +106,17 @@
           "artifact_url": "https://github.com/RichardDaffern/Novel_Library/actions/runs/42368620891/artifacts/13574785699",
           "completed_at_utc": "2026-11-07T12:28:28Z",
           "expires_at_utc": "2026-11-14T12:28:22Z"
+        },
+        {
+          "range": "all",
+          "status": "complete",
+          "chapter_count": 624,
+          "run_id": 42513348683,
+          "run_url": "https://github.com/RichardDaffern/Novel_Library/actions/runs/42513348683",
+          "artifact_id": 13634379248,
+          "artifact_url": "https://github.com/RichardDaffern/Novel_Library/actions/runs/42513348683/artifacts/13634379248",
+          "completed_at_utc": "2026-11-08T21:18:06Z",
+          "expires_at_utc": "2026-11-15T21:18:06Z"
         }
       ]
     },
