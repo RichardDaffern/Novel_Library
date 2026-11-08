@@ -57,7 +57,7 @@ jobs:
     if: needs.prepare.outputs.has_work == 'true'
     strategy:
       fail-fast: false
-      max-parallel: 1
+      max-parallel: 3
       matrix: ${{ fromJson(needs.prepare.outputs.matrix) }}
     uses: ./.github/workflows/download-novel.yml
     with:

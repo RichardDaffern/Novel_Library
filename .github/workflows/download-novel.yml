@@ -40,9 +40,12 @@ permissions:
   pull-requests: write
   actions: read
 
+# Different novels may run together. Duplicate runs for the same exact URL
+# queue rather than interrupting ongoing downloads.
 concurrency:
-  group: novel-library-registry
+  group: novel-download-${{ inputs.novel_url }}
   cancel-in-progress: false
+  queue: max
 
 jobs:
   prepare:
@@ -51,6 +54,7 @@ jobs:
     outputs:
       skip: ${{ steps.registry.outputs.skip }}
       matrix: ${{ steps.make_plan.outputs.matrix }}
+      parallelism: ${{ steps.make_plan.outputs.parallelism }}
       key: ${{ steps.make_plan.outputs.key }}
       first: ${{ steps.make_plan.outputs.first }}
       last: ${{ steps.make_plan.outputs.last }}
@@ -111,7 +115,7 @@ jobs:
     timeout-minutes: 90
     strategy:
       fail-fast: false
-      max-parallel: 2
+      max-parallel: ${{ fromJSON(needs.prepare.outputs.parallelism) }}
       matrix: ${{ fromJson(needs.prepare.outputs.matrix) }}
     steps:
       - uses: actions/checkout@v4
@@ -208,45 +212,22 @@ jobs:
           if-no-files-found: error
           compression-level: 6
 
-      - name: Register completed download
+
+      - name: Regenerate registry from latest main and automatically merge PR
         env:
           NOVEL_URL: ${{ inputs.novel_url }}
           CHAPTER_RANGE: ${{ inputs.chapter_range }}
           ARTIFACT_ID: ${{ steps.upload.outputs.artifact-id }}
           ARTIFACT_URL: ${{ steps.upload.outputs.artifact-url }}
+          GH_TOKEN: ${{ github.token }}
         run: |
-          python tools/download_registry.py record \
+          python -u -m tools.publish_registry \
             --url "$NOVEL_URL" \
             --chapter-range "$CHAPTER_RANGE" \
             --run-id "$GITHUB_RUN_ID" \
             --artifact-id "$ARTIFACT_ID" \
             --artifact-url "$ARTIFACT_URL" \
             --downloads-dir downloads
-
-      - name: Open and squash-merge registry-only pull request
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          BRANCH="registry/download-$GITHUB_RUN_ID-${{ needs.prepare.outputs.key }}"
-          git switch -c "$BRANCH"
-          git add downloaded_novels.json DOWNLOADED_NOVELS.md
-          git commit -m "Track completed novel archive ($GITHUB_RUN_ID)"
-          git push --set-upstream origin "$BRANCH"
-          if ! PR_URL="$(gh pr create --base main --head "$BRANCH" \
-            --title "Track completed novel download #$GITHUB_RUN_ID" \
-            --body "Only validated novel metadata is committed. The full EPUB and TXT files are in the Actions artifact.")"; then
-            echo "::error::Registry PR creation failed. The successfully downloaded novel artifact is still available."
-            echo "## Registry PR could not be created" >> "$GITHUB_STEP_SUMMARY"
-            echo "GitHub Actions must be allowed to create pull requests. Enable Settings > Actions > General > Workflow permissions > Allow GitHub Actions to create and approve pull requests." >> "$GITHUB_STEP_SUMMARY"
-            echo "The metadata-only branch was saved. Open a PR manually from: https://github.com/$GITHUB_REPOSITORY/compare/main...$BRANCH?expand=1" >> "$GITHUB_STEP_SUMMARY"
-            exit 1
-          fi
-          echo "Registry PR: $PR_URL" >> "$GITHUB_STEP_SUMMARY"
-          gh pr merge "$PR_URL" --squash --delete-branch
-          echo "Complete archive: ${{ steps.upload.outputs.artifact-url }}" >> "$GITHUB_STEP_SUMMARY"
 
   report:
     needs: [prepare, chapter-batches, assemble]
