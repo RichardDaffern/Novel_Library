@@ -8,6 +8,7 @@ Expired artifacts cannot be retrieved; such entries remain as history but will n
 |---|---|---:|---|---|
 | [Abe the Wizard](https://novelfull.com/abe-the-wizard.html) | all | 1512 | [Available](https://github.com/RichardDaffern/Novel_Library/actions/runs/42393126629/artifacts/13592251409) | 2026-11-14T21:53:01Z |
 | [Chaotic Sword God](https://novelfull.com/chaotic-sword-god.html) | all | 4035 | [Available](https://github.com/RichardDaffern/Novel_Library/actions/runs/42466652147/artifacts/13619781585) | 2026-11-15T13:43:07Z |
+| [Crazy Detective](https://novelfull.com/crazy-detective.html) | all | 2686 | [Available](https://github.com/RichardDaffern/Novel_Library/actions/runs/42513475192/artifacts/13636899276) | 2026-11-15T22:35:59Z |
 | [Cultivation! My Augmented Statuses Have Unlimited Duration](https://novelfull.com/cultivation-my-augmented-statuses-have-unlimited-duration.html) | all | 904 | [Available](https://github.com/RichardDaffern/Novel_Library/actions/runs/42513475192/artifacts/13636307740) | 2026-11-15T22:04:49Z |
 | [From Soldier to Officer: A Game Addict's Journey](https://novelfull.com/from-soldier-to-officer-a-game-addicts-journey.html) | all | 440 | [Available](https://github.com/RichardDaffern/Novel_Library/actions/runs/42513447856/artifacts/13636196182) | 2026-11-15T21:50:28Z |
 | [Global Lord: 100% Drop Rate](https://novelfull.com/global-lord-100-drop-rate.html) | all | 1979 | [Available](https://github.com/RichardDaffern/Novel_Library/actions/runs/42513447856/artifacts/13636378607) | 2026-11-15T22:12:59Z |
