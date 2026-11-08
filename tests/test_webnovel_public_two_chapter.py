@@ -87,5 +87,40 @@ class PublicTwoChapterTests(unittest.TestCase):
             self.assertFalse(out.exists())
 
 
+    def test_site_navigation_unlock_message_does_not_reject_readable_chapter(self):
+        html = """<html><body><nav><a>Unlock this chapter</a></nav>
+        <header>Premium chapter offers are available</header>
+        <div class="cha-content"><p>An original chapter passage about a quiet
+        harbour and a forgotten lighthouse. Characters arrive in the evening
+        and discover an old map within the abandoned workshop.</p>
+        <p>Another invented paragraph describes their new journey.</p></div>
+        <aside>Subscribe to unlock other chapters</aside></body></html>"""
+        result = parse_public_chapter(html, CH1, "Chapter 1")
+        self.assertIn("original chapter passage", result)
+        self.assertNotIn("Unlock this chapter", result)
+        self.assertNotIn("Subscribe to unlock", result)
+
+    def test_lock_notice_inside_chapter_is_still_rejected(self):
+        html = """<html><div class="cha-content">
+        <p>Unlock this chapter to continue reading.</p>
+        <p>The rest of the content is unavailable.</p></div></html>"""
+        with self.assertRaisesRegex(PublicChapterError, "locked"):
+            parse_public_chapter(html, CH1, "Chapter 1")
+
+    def test_page_with_lock_notice_but_no_chapter_is_rejected(self):
+        html = """<html><body><header>Unlock this chapter</header>
+        <main>No readable chapter text was saved.</main></body></html>"""
+        with self.assertRaisesRegex(PublicChapterError, "locked"):
+            parse_public_chapter(html, CH1, "Chapter 1")
+
+    def test_embedded_script_unlock_notice_does_not_count_as_body_text(self):
+        html = """<html><div class="cha-content"><script>
+        var banner = "Unlock this chapter";</script>
+        <p>Completely original fictional prose begins at a quiet station;
+        the traveller notices a blue train arriving before sunset.
+        The next paragraph has more invented words to fill the chapter.</p></div></html>"""
+        self.assertIn("original fictional prose", parse_public_chapter(html, CH1, "Chapter 1"))
+
+
 if __name__ == "__main__":
     unittest.main()
