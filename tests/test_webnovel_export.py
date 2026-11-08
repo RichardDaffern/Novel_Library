@@ -66,7 +66,7 @@ class WebNovelExportTests(unittest.TestCase):
     def test_refuses_missing_authorisation_marker(self):
         data = sample()
         data["source"] = "webnovel-scraped"
-        with self.assertRaisesRegex(ExportError, "user-supplied-authorised"):
+        with self.assertRaisesRegex(ExportError, "authorised local or public text"):
             validate(data)
 
     def test_refuses_reordered_chapters(self):

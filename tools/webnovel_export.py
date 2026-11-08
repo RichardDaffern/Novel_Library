@@ -39,8 +39,8 @@ def validate(data):
     chapters = data.get("chapters")
     if not isinstance(chapters, list) or not 1 <= len(chapters) <= MAX_CHAPTERS:
         raise ExportError("Exactly one or two chapters are permitted")
-    if data.get("source") != "user-supplied-authorised":
-        raise ExportError("source must be user-supplied-authorised")
+    if data.get("source") not in {"user-supplied-authorised", "webnovel-public-with-user-confirmed-rights"}:
+        raise ExportError("source must identify authorised local or public text")
     result = []
     for index, ch in enumerate(chapters, 1):
         if not isinstance(ch, dict):
