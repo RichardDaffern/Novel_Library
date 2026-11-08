@@ -88,6 +88,49 @@ def _checked_page(page, url: str) -> str:
     return html
 
 
+def discover_first_two_chapters(page, book_html, book_url):
+    """Use the visible Table of Contents tab if chapter links are not rendered yet."""
+    try:
+        return public_first_two_links(book_html, book_url)
+    except PublicChapterError:
+        pass
+
+    # The user's video shows that WebNovel initially opens the "About" tab.
+    # The chapter anchors appear in the normal "Table of Contents" UI instead.
+    # Clicking a visible tab is ordinary browser navigation, not a hidden API
+    # request, paywall unlock, challenge bypass or automated access evasion.
+    try:
+        page.get_by_text("Table of Contents", exact=True).click(timeout=5000)
+    except Exception as exc:
+        raise BrowserProbeError(
+            "Table of Contents tab could not be opened in the browser; "
+            "no chapter pages requested"
+        ) from exc
+
+    if page.url.rstrip("/") != book_url.rstrip("/"):
+        raise BrowserProbeError("Table of Contents redirected away from the book URL")
+
+    # Allow the site's ordinary UI to render the chapter links after the tab
+    # click. These waits do not retry or reload denied network requests.
+    for attempt in range(10):
+        rendered = page.content()
+        soup = BeautifulSoup(rendered, "html.parser")
+        title = soup.title.get_text(" ", strip=True).lower() if soup.title else ""
+        if any(marker in title for marker in CHALLENGE_TITLES):
+            raise BrowserProbeError("Access challenge displayed after opening Table of Contents")
+        try:
+            return public_first_two_links(rendered, book_url)
+        except PublicChapterError as exc:
+            if "Conflicting URLs" in str(exc):
+                raise BrowserProbeError(str(exc)) from exc
+        if attempt < 9:
+            page.wait_for_timeout(500)
+    raise BrowserProbeError(
+        "Table of Contents opened, but Chapters 1 and 2 were not found as "
+        "public links. No chapter pages requested."
+    )
+
+
 def _do_probe(chromium, book_url, output_dir, chapter_urls=None, *, headless=False):
     browser = chromium.launch(headless=headless, timeout=PAGE_TIMEOUT_MS)
     try:
@@ -104,13 +147,7 @@ def _do_probe(chromium, book_url, output_dir, chapter_urls=None, *, headless=Fal
                     raise BrowserProbeError("Two distinct chapter URLs are required")
                 links = list(zip(urls, ["Chapter 1", "Chapter 2"]))
             else:
-                try:
-                    links = public_first_two_links(html, book_url)
-                except PublicChapterError as exc:
-                    raise BrowserProbeError(
-                        "Could not find two public chapter links in the rendered book page. "
-                        "Supply --chapter-1-url and --chapter-2-url copied from the site's normal chapter links."
-                    ) from exc
+                links = discover_first_two_chapters(page, html, book_url)
             chapters = []
             for index, (url, label) in enumerate(links, start=1):
                 chapter_html = _checked_page(page, url)
