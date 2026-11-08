@@ -121,7 +121,7 @@ def probe_two_chapters(book_url, output_dir, *, confirm_rights=False, fetcher=ge
         chapter_html = fetcher(url)
         body = parse_public_chapter(chapter_html, url, label)
         chapters.append({"position": number, "title": label, "text": body})
-    return export({"source": "user-supplied-authorised", "title": metadata["title"],
+    return export({"source": "webnovel-public-with-user-confirmed-rights", "title": metadata["title"],
                    "author": metadata["author"] or "Unknown",
                    "chapters": chapters}, output_dir)
 
