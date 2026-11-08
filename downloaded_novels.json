@@ -38,6 +38,24 @@
       ]
     },
     {
+      "url": "https://novelfull.com/i-alone-level-up.html",
+      "title": "I Alone Level-Up",
+      "author": "Chugong",
+      "downloads": [
+        {
+          "range": "all",
+          "status": "complete",
+          "chapter_count": 270,
+          "run_id": 42513348683,
+          "run_url": "https://github.com/RichardDaffern/Novel_Library/actions/runs/42513348683",
+          "artifact_id": 13634103379,
+          "artifact_url": "https://github.com/RichardDaffern/Novel_Library/actions/runs/42513348683/artifacts/13634103379",
+          "completed_at_utc": "2026-11-08T21:14:14Z",
+          "expires_at_utc": "2026-11-15T21:14:14Z"
+        }
+      ]
+    },
+    {
       "url": "https://novelfull.com/i-can-track-everything.html",
       "title": "I Can Track Everything",
       "author": "",
