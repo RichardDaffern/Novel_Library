@@ -8,6 +8,7 @@ Expired artifacts cannot be retrieved; such entries remain as history but will n
 |---|---|---:|---|---|
 | [Abe the Wizard](https://novelfull.com/abe-the-wizard.html) | all | 1512 | [Available](https://github.com/RichardDaffern/Novel_Library/actions/runs/42393126629/artifacts/13592251409) | 2026-11-14T21:53:01Z |
 | [Chaotic Sword God](https://novelfull.com/chaotic-sword-god.html) | all | 4035 | [Available](https://github.com/RichardDaffern/Novel_Library/actions/runs/42466652147/artifacts/13619781585) | 2026-11-15T13:43:07Z |
+| [From Soldier to Officer: A Game Addict's Journey](https://novelfull.com/from-soldier-to-officer-a-game-addicts-journey.html) | all | 440 | [Available](https://github.com/RichardDaffern/Novel_Library/actions/runs/42513447856/artifacts/13636196182) | 2026-11-15T21:50:28Z |
 | [I Alone Level-Up](https://novelfull.com/i-alone-level-up.html) | all | 270 | [Available](https://github.com/RichardDaffern/Novel_Library/actions/runs/42513348683/artifacts/13634103379) | 2026-11-15T21:14:14Z |
 | [I am the Monarch](https://novelfull.com/i-am-the-monarch.html) | all | 336 | [Available](https://github.com/RichardDaffern/Novel_Library/actions/runs/42513431015/artifacts/13634498595) | 2026-11-15T21:18:11Z |
 | [I Can Track Everything](https://novelfull.com/i-can-track-everything.html) | all | 907 | [Available](https://github.com/RichardDaffern/Novel_Library/actions/runs/42368776684/artifacts/13574863593) | 2026-11-14T12:55:20Z |
