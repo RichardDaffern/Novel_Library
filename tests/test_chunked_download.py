@@ -12,7 +12,7 @@ from types import SimpleNamespace
 
 from novel_downloader import epub_chapters
 from tools.chunked_download import (
-    SYNTHETIC_URL, assemble, assembled_title, chapter_plan, chapter_count_from_metadata,
+    SYNTHETIC_URL, assemble, assembled_title, chapter_plan, choose_parallelism, chapter_count_from_metadata,
     discover_count, identity, validate_piece,
     _epub,
 )
@@ -109,6 +109,34 @@ class ChapterBatchTests(unittest.TestCase):
         self.assertEqual(count, 4035)
         self.assertEqual(chapter_plan(URL, count)["pieces"][-1]["end"], 4035)
         self.assertTrue(runner.call_args.kwargs["check"])
+
+    def test_adaptive_parallelism_stays_between_one_and_six(self):
+        examples = [
+            (1, 1), (200, 1), (600, 1),
+            (601, 2), (1200, 2), (1201, 3),
+            (1800, 3), (2400, 4), (3000, 5),
+            (3001, 6), (4035, 6), (20000, 6),
+        ]
+        for chapters, expected in examples:
+            with self.subTest(chapters=chapters):
+                batches = (chapters + 199) // 200
+                self.assertEqual(choose_parallelism(chapters, batches), expected)
+
+    def test_worker_count_never_exceeds_available_batches(self):
+        self.assertEqual(choose_parallelism(4035, 1), 1)
+        self.assertEqual(choose_parallelism(4035, 3), 3)
+        self.assertEqual(choose_parallelism(4035, 6), 6)
+        for chosen, batches in ((0, 1), (1, 0), (-1, 3)):
+            with self.subTest(chosen=chosen, batches=batches):
+                with self.assertRaises(ValueError):
+                    choose_parallelism(chosen, batches)
+
+    def test_range_parallelism_uses_requested_chapters_not_whole_novel(self):
+        plan = chapter_plan(URL, 4035, "101-350")
+        self.assertEqual(plan["parallelism"], 1)
+        self.assertEqual(len(plan["pieces"]), 2)
+        full = chapter_plan(URL, 4035)
+        self.assertEqual(full["parallelism"], 6)
 
     def test_four_thousand_chapters_fit_in_bounded_independent_jobs(self):
         plan = chapter_plan(URL, 4035)
