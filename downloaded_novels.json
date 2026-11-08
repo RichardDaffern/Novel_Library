@@ -164,6 +164,24 @@
       ]
     },
     {
+      "url": "https://novelfull.com/the-surgeons-studio.html",
+      "title": "The Surgeon’s Studio",
+      "author": "Black Ursa Prime",
+      "downloads": [
+        {
+          "range": "all",
+          "status": "complete",
+          "chapter_count": 2977,
+          "run_id": 42494513599,
+          "run_url": "https://github.com/RichardDaffern/Novel_Library/actions/runs/42494513599",
+          "artifact_id": 13627346622,
+          "artifact_url": "https://github.com/RichardDaffern/Novel_Library/actions/runs/42494513599/artifacts/13627346622",
+          "completed_at_utc": "2026-11-08T17:31:08Z",
+          "expires_at_utc": "2026-11-15T17:31:08Z"
+        }
+      ]
+    },
+    {
       "url": "https://novelfull.com/the-world-online.html",
       "title": "The World Online",
       "author": "Sheng Xiao Jian Ke",
