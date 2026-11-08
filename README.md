@@ -63,6 +63,37 @@ The bulk workflow checks the downloaded-novels registry once, removes duplicate 
 
 The overall bulk workflow reports failure if any novel fails; completed novels and their downloadable artifacts remain available. The workflows do not publish novel text or EPUBs in Git, and only authorised downloads should be submitted.
 
+
+## WebNovel compatibility feasibility (separate, metadata-only)
+
+WebNovel is **not yet supported as a chapter-download source**. Its public
+`/book/` pages can expose a title, author and listed chapter count, but this
+does not establish permission or technical support for exporting chapter text.
+WebNovel's terms restrict reproduction and circumventing access controls;
+locked/premium chapters and authentication are deliberately unsupported.
+
+A separate, read-only metadata probe lives in
+[`tools/webnovel_probe.py`](tools/webnovel_probe.py), independent of
+`novel_downloader.py` and the NovelFull GitHub workflows.
+
+Run a one-page public-book metadata check (no login, chapter requests or text exports):
+
+~~~powershell
+python -m tools.webnovel_probe "https://www.webnovel.com/book/22196546206090805"
+~~~
+
+The probe makes one normal HTTPS request to the public book page and prints
+JSON containing the available book metadata and
+`"chapter_export_verified": false`. If the site blocks automated access
+or changes its page layout, the probe fails without bypassing restrictions.
+You can test the parser offline using a supplied HTML fixture via
+`--html-file book.html`. No WebNovel chapter files or EPUBs are produced.
+
+WebNovel's own reading app may offer an **in-app offline download** for
+eligible chapters. In-app caching is different from an authorised EPUB/TXT
+export. A standalone chapter-export adapter would require an approved
+source/permission and a separate implementation and validation process.
+
 ## Downloaded-novel list
 
 View [DOWNLOADED_NOVELS.md](DOWNLOADED_NOVELS.md) for completed downloads. The index includes previously verified completed jobs, including the recovered Abe the Wizard entry from bulk run 42393126629. The registry is an index, **not permanent storage**: once an artifact expires, a normal rerun is allowed so the book can be archived again, subject to permission.
