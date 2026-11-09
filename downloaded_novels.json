@@ -481,6 +481,24 @@
       ]
     },
     {
+      "url": "https://novelfull.com/spirit-realm.html",
+      "title": "Spirit Realm",
+      "author": "Ni Cang Tian",
+      "downloads": [
+        {
+          "range": "all",
+          "status": "complete",
+          "chapter_count": 1840,
+          "run_id": 42513348683,
+          "run_url": "https://github.com/RichardDaffern/Novel_Library/actions/runs/42513348683",
+          "artifact_id": 13643386308,
+          "artifact_url": "https://github.com/RichardDaffern/Novel_Library/actions/runs/42513348683/artifacts/13643386308",
+          "completed_at_utc": "2026-11-09T01:26:02Z",
+          "expires_at_utc": "2026-11-16T01:26:02Z"
+        }
+      ]
+    },
+    {
       "url": "https://novelfull.com/the-legendary-moonlight-sculptor.html",
       "title": "The Legendary Moonlight Sculptor",
       "author": "NAM Heesung",
