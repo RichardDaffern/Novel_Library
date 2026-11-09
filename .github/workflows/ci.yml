@@ -115,6 +115,10 @@ jobs:
           $output = & cmd.exe /d /c 'echo.|call "Download-All-Novels.cmd" -Limit -1' 2>&1 | Out-String
           if ($output -notmatch 'ERROR: Downloader exited with code') { throw "Launcher hid its error: $output" }
           if ($output -notmatch 'Press any key to close this window') { throw "Launcher did not reach its pause: $output" }
+          if ($LASTEXITCODE -eq 0) { throw "The simulated launcher failure unexpectedly exited successfully: $output" }
+          # Expected negative test: clear the native command's nonzero code so
+          # the pwsh GitHub Actions step itself finishes successfully.
+          $global:LASTEXITCODE = 0
           Write-Host 'PowerShell 5.1 and launcher failure path verified (no network requests)'
       - name: Verify chunked EPUB assembly on Windows (offline)
         shell: pwsh
