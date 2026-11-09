@@ -23,7 +23,9 @@ function Get-ValidBook([string]$sourceDirectory, [string]$novelUrl) {
         try {
             $meta = Get-Content -LiteralPath $file.FullName -Raw -Encoding UTF8 | ConvertFrom-Json
             if ((Get-NovelKey ([string]$meta.source_url)) -ne $wanted) { Write-Warning "Skipping unrelated book in $($dir): $($meta.source_url)"; continue }
-            $chapterList = @(Get-Content -LiteralPath $manifest -Raw -Encoding UTF8 | ConvertFrom-Json)
+            $parsedChapters = Get-Content -LiteralPath $manifest -Raw -Encoding UTF8 | ConvertFrom-Json
+            $chapterList = [System.Collections.Generic.List[object]]::new()
+            foreach ($item in $parsedChapters) { $chapterList.Add($item) }
             if ([int]$meta.chapter_count -lt 1 -or $chapterList.Count -ne [int]$meta.chapter_count) { Write-Warning "Invalid manifest size for $($dir): expected $($meta.chapter_count), got $($chapterList.Count)"; continue }
             if ((Get-Item -LiteralPath $epub).Length -lt 100) { Write-Warning "EPUB missing or too small in $($dir)"; continue }
             $seen = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
@@ -59,7 +61,11 @@ function Test-NovelZip([string]$path, [string]$novelUrl) {
         try { $meta = $reader.ReadToEnd() | ConvertFrom-Json } finally { $reader.Dispose() }
         if ((Get-NovelKey ([string]$meta.source_url)) -ne (Get-NovelKey $novelUrl)) { return $false }
         $reader = [System.IO.StreamReader]::new($manifestEntry.Open())
-        try { $chapters = @($reader.ReadToEnd() | ConvertFrom-Json) } finally { $reader.Dispose() }
+        try {
+            $parsedChapters = $reader.ReadToEnd() | ConvertFrom-Json
+            $chapters = [System.Collections.Generic.List[object]]::new()
+            foreach ($item in $parsedChapters) { $chapters.Add($item) }
+        } finally { $reader.Dispose() }
         if ($chapters.Count -lt 1 -or $chapters.Count -ne [int]$meta.chapter_count) { return $false }
         if ($archive.Entries.Count -ne ($chapters.Count + 3)) { return $false }
         foreach ($chapter in $chapters) {
