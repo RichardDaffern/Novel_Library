@@ -146,6 +146,24 @@
       ]
     },
     {
+      "url": "https://novelfull.com/god-of-cooking.html",
+      "title": "God of Cooking",
+      "author": "Yangchigi Jali",
+      "downloads": [
+        {
+          "range": "all",
+          "status": "complete",
+          "chapter_count": 651,
+          "run_id": 42513447856,
+          "run_url": "https://github.com/RichardDaffern/Novel_Library/actions/runs/42513447856",
+          "artifact_id": 13641331757,
+          "artifact_url": "https://github.com/RichardDaffern/Novel_Library/actions/runs/42513447856/artifacts/13641331757",
+          "completed_at_utc": "2026-11-09T00:38:37Z",
+          "expires_at_utc": "2026-11-16T00:38:37Z"
+        }
+      ]
+    },
+    {
       "url": "https://novelfull.com/i-alone-level-up.html",
       "title": "I Alone Level-Up",
       "author": "Chugong",
