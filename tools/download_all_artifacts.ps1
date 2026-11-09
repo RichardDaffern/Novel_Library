@@ -30,16 +30,33 @@ if ($BrowserLogin) {
     if ($LASTEXITCODE -ne 0) { throw "GitHub browser sign-in was cancelled or unsuccessful." }
 }
 
-& gh auth status *> $null
-if ($LASTEXITCODE -ne 0) {
+# Windows PowerShell 5.1 can treat native stderr as a terminating error.
+# Check login without that behaviour so the browser prompt remains reachable.
+$previousPreference = $ErrorActionPreference
+$loginValid = $false
+try {
+    $ErrorActionPreference = 'Continue'
+    & gh auth status *> $null
+    $loginValid = ($LASTEXITCODE -eq 0)
+} finally {
+    $ErrorActionPreference = $previousPreference
+}
+if (-not $loginValid) {
     Write-Host "No working GitHub CLI authentication was detected." -ForegroundColor Yellow
     $reply = Read-Host "Open browser-based GitHub sign-in now? [Y/n]"
     if ([string]::IsNullOrWhiteSpace($reply) -or $reply -match '^(?i:y|yes)$') {
         Write-Host 'GitHub CLI will display a one-time code and open your browser.'
         & gh auth login --web --clipboard --skip-ssh-key
         if ($LASTEXITCODE -ne 0) { throw "GitHub browser sign-in failed or was cancelled." }
-        & gh auth status *> $null
-        if ($LASTEXITCODE -ne 0) { throw "GitHub CLI still reports no working login." }
+        $previousPreference = $ErrorActionPreference
+        try {
+            $ErrorActionPreference = 'Continue'
+            & gh auth status *> $null
+            $loginValid = ($LASTEXITCODE -eq 0)
+        } finally {
+            $ErrorActionPreference = $previousPreference
+        }
+        if (-not $loginValid) { throw "GitHub CLI still reports no working login." }
     } else {
         throw "No GitHub CLI login. Run 'gh auth login --web --clipboard' in a terminal to sign in."
     }
