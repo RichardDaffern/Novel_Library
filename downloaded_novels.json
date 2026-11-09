@@ -463,6 +463,24 @@
       ]
     },
     {
+      "url": "https://novelfull.com/sovereign-of-the-three-realms.html",
+      "title": "Sovereign of the Three Realms",
+      "author": "Li Tian",
+      "downloads": [
+        {
+          "range": "all",
+          "status": "complete",
+          "chapter_count": 2376,
+          "run_id": 42513348683,
+          "run_url": "https://github.com/RichardDaffern/Novel_Library/actions/runs/42513348683",
+          "artifact_id": 13643540730,
+          "artifact_url": "https://github.com/RichardDaffern/Novel_Library/actions/runs/42513348683/artifacts/13643540730",
+          "completed_at_utc": "2026-11-09T01:25:45Z",
+          "expires_at_utc": "2026-11-16T01:25:45Z"
+        }
+      ]
+    },
+    {
       "url": "https://novelfull.com/the-legendary-moonlight-sculptor.html",
       "title": "The Legendary Moonlight Sculptor",
       "author": "NAM Heesung",
