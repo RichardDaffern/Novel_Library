@@ -949,6 +949,24 @@
       ]
     },
     {
+      "url": "https://novelfull.com/talisman-emperor.html",
+      "title": "Talisman Emperor",
+      "author": "Xiao Jinyu",
+      "downloads": [
+        {
+          "range": "all",
+          "status": "complete",
+          "chapter_count": 2251,
+          "run_id": 42513348683,
+          "run_url": "https://github.com/RichardDaffern/Novel_Library/actions/runs/42513348683",
+          "artifact_id": 13652776298,
+          "artifact_url": "https://github.com/RichardDaffern/Novel_Library/actions/runs/42513348683/artifacts/13652776298",
+          "completed_at_utc": "2026-11-09T05:44:35Z",
+          "expires_at_utc": "2026-11-16T05:44:35Z"
+        }
+      ]
+    },
+    {
       "url": "https://novelfull.com/the-human-emperor.html",
       "title": "The Human Emperor",
       "author": "Huangfu Qi",
