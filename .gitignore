@@ -12,3 +12,4 @@ smoke/
 *.zip
 *.pyc
 Downloaded_Novels/
+download-last-run.log

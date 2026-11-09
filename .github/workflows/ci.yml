@@ -99,7 +99,27 @@ jobs:
           }
           if (-not (Test-Path 'Download-All-Novels.cmd')) { throw 'Windows launcher is missing' }
           if (-not ((Get-Content 'Download-All-Novels.cmd' -Raw) -like '*tools\download_all_artifacts.ps1*')) { throw 'Launcher does not invoke downloader' }
-          Write-Host 'Windows artifact downloader syntax and launcher verified (no network requests)'
+          # Parse with Windows PowerShell 5.1, the same executable used by the CMD launcher.
+          $legacyErrors = $null
+          $legacyParser = @'
+          $path = (Resolve-Path 'tools/download_all_artifacts.ps1').Path
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile($path, [ref]$tokens, [ref]$errors) | Out-Null
+          if ($errors.Count -gt 0) { $errors | ForEach-Object { Write-Host $_.Message }; exit 1 }
+          '@
+          $legacyParser | powershell.exe -NoProfile -NonInteractive -Command -
+          if ($LASTEXITCODE -ne 0) { throw 'Windows PowerShell 5.1 parse failed' }
+          # Simulate a parameter-validation error before contacting GitHub. This
+          # catches CMD parentheses bugs that would skip the final pause.
+          $output = & cmd.exe /d /c 'echo.|call "Download-All-Novels.cmd" -Limit -1' 2>&1 | Out-String
+          if ($output -notmatch 'ERROR: Downloader exited with code') { throw "Launcher hid its error: $output" }
+          if ($output -notmatch 'Press any key to close this window') { throw "Launcher did not reach its pause: $output" }
+          if ($LASTEXITCODE -eq 0) { throw "The simulated launcher failure unexpectedly exited successfully: $output" }
+          # Expected negative test: clear the native command's nonzero code so
+          # the pwsh GitHub Actions step itself finishes successfully.
+          $global:LASTEXITCODE = 0
+          Write-Host 'PowerShell 5.1 and launcher failure path verified (no network requests)'
       - name: Verify chunked EPUB assembly on Windows (offline)
         shell: pwsh
         run: |
