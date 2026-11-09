@@ -119,6 +119,18 @@ jobs:
           # Expected negative test: clear the native command's nonzero code so
           # the pwsh GitHub Actions step itself finishes successfully.
           $global:LASTEXITCODE = 0
+          # Positive startup regression: PowerShell 5.1 must bind parameters
+          # and resolve the default folder, even when its path has spaces.
+          $smokeRoot = Join-Path $env:RUNNER_TEMP 'Novel Library With Spaces'
+          $smokeTools = Join-Path $smokeRoot 'tools'
+          New-Item -ItemType Directory -Force -Path $smokeTools | Out-Null
+          Copy-Item 'tools/download_all_artifacts.ps1' (Join-Path $smokeTools 'download_all_artifacts.ps1')
+          $smokeScript = Join-Path $smokeTools 'download_all_artifacts.ps1'
+          $startup = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $smokeScript -BrowserLogin -CheckSetup 2>&1 | Out-String
+          if ($LASTEXITCODE -ne 0) { throw "PowerShell 5.1 failed at argument binding/startup: $startup" }
+          if ($startup -notmatch 'Startup self-check passed') { throw "Missing startup success message: $startup" }
+          if (-not $startup.Contains((Join-Path $smokeRoot 'Downloaded_Novels'))) { throw "Incorrect default download path: $startup" }
+          if (-not (Test-Path (Join-Path $smokeRoot 'download-last-run.log'))) { throw "Startup did not create the diagnostic log: $startup" }
           Write-Host 'PowerShell 5.1 and launcher failure path verified (no network requests)'
       - name: Verify chunked EPUB assembly on Windows (offline)
         shell: pwsh
