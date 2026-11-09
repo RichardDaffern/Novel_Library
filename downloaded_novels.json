@@ -661,6 +661,24 @@
       ]
     },
     {
+      "url": "https://novelfull.com/the-human-emperor.html",
+      "title": "The Human Emperor",
+      "author": "Huangfu Qi",
+      "downloads": [
+        {
+          "range": "all",
+          "status": "complete",
+          "chapter_count": 2467,
+          "run_id": 42513372924,
+          "run_url": "https://github.com/RichardDaffern/Novel_Library/actions/runs/42513372924",
+          "artifact_id": 13644389821,
+          "artifact_url": "https://github.com/RichardDaffern/Novel_Library/actions/runs/42513372924/artifacts/13644389821",
+          "completed_at_utc": "2026-11-09T02:16:03Z",
+          "expires_at_utc": "2026-11-16T02:16:03Z"
+        }
+      ]
+    },
+    {
       "url": "https://novelfull.com/the-legendary-moonlight-sculptor.html",
       "title": "The Legendary Moonlight Sculptor",
       "author": "NAM Heesung",
