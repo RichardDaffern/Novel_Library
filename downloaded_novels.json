@@ -524,6 +524,24 @@
       ]
     },
     {
+      "url": "https://novelfull.com/martial-peak.html",
+      "title": "Martial Peak",
+      "author": "Momo",
+      "downloads": [
+        {
+          "range": "all",
+          "status": "complete",
+          "chapter_count": 6133,
+          "run_id": 42513414021,
+          "run_url": "https://github.com/RichardDaffern/Novel_Library/actions/runs/42513414021",
+          "artifact_id": 13651454047,
+          "artifact_url": "https://github.com/RichardDaffern/Novel_Library/actions/runs/42513414021/artifacts/13651454047",
+          "completed_at_utc": "2026-11-09T05:35:13Z",
+          "expires_at_utc": "2026-11-16T05:35:13Z"
+        }
+      ]
+    },
+    {
       "url": "https://novelfull.com/medical-master.html",
       "title": "Medical Master",
       "author": "Walk The World",
