@@ -740,6 +740,24 @@
       ]
     },
     {
+      "url": "https://novelfull.com/monarch-of-evernight.html",
+      "title": "Monarch of Evernight",
+      "author": "Misty South",
+      "downloads": [
+        {
+          "range": "all",
+          "status": "complete",
+          "chapter_count": 1522,
+          "run_id": 42513414021,
+          "run_url": "https://github.com/RichardDaffern/Novel_Library/actions/runs/42513414021",
+          "artifact_id": 13657376302,
+          "artifact_url": "https://github.com/RichardDaffern/Novel_Library/actions/runs/42513414021/artifacts/13657376302",
+          "completed_at_utc": "2026-11-09T07:40:24Z",
+          "expires_at_utc": "2026-11-16T07:40:24Z"
+        }
+      ]
+    },
+    {
       "url": "https://novelfull.com/my-genes-can-evolve-limitlessly.html",
       "title": "My Genes Can Evolve Limitlessly",
       "author": "Rainy Blue Skies",
