@@ -650,6 +650,24 @@
       ]
     },
     {
+      "url": "https://novelfull.com/painting-of-the-nine-immortals.html",
+      "title": "Painting of the Nine Immortals",
+      "author": "Autumn Morning",
+      "downloads": [
+        {
+          "range": "all",
+          "status": "complete",
+          "chapter_count": 1003,
+          "run_id": 42513387437,
+          "run_url": "https://github.com/RichardDaffern/Novel_Library/actions/runs/42513387437",
+          "artifact_id": 13652262814,
+          "artifact_url": "https://github.com/RichardDaffern/Novel_Library/actions/runs/42513387437/artifacts/13652262814",
+          "completed_at_utc": "2026-11-09T05:39:07Z",
+          "expires_at_utc": "2026-11-16T05:39:07Z"
+        }
+      ]
+    },
+    {
       "url": "https://novelfull.com/pocket-hunting-dimension.html",
       "title": "Pocket Hunting Dimension",
       "author": "Blue Sky Washing Rain",
