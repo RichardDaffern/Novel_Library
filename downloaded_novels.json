@@ -326,6 +326,24 @@
       ]
     },
     {
+      "url": "https://novelfull.com/heavens-devourer.html",
+      "title": "Heaven’s Devourer",
+      "author": "Feng Qingyang",
+      "downloads": [
+        {
+          "range": "all",
+          "status": "complete",
+          "chapter_count": 1829,
+          "run_id": 42513447856,
+          "run_url": "https://github.com/RichardDaffern/Novel_Library/actions/runs/42513447856",
+          "artifact_id": 13654866424,
+          "artifact_url": "https://github.com/RichardDaffern/Novel_Library/actions/runs/42513447856/artifacts/13654866424",
+          "completed_at_utc": "2026-11-09T06:46:01Z",
+          "expires_at_utc": "2026-11-16T06:46:01Z"
+        }
+      ]
+    },
+    {
       "url": "https://novelfull.com/i-alone-level-up.html",
       "title": "I Alone Level-Up",
       "author": "Chugong",
