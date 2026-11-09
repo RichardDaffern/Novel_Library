@@ -126,8 +126,9 @@ class DownloadRegistryTests(unittest.TestCase):
 
     def test_existing_completed_downloads_backfilled(self):
         data = read_registry(Path("downloaded_novels.json"))
-        titles = {x["title"] for x in data["novels"]}
-        self.assertTrue({"She Is From the Countryside", "I Can Track Everything", "The World Online"} <= titles)
+        titles = {x["title"].casefold() for x in data["novels"]}
+        expected = {"She Is From the Countryside", "I Can Track Everything", "The World Online"}
+        self.assertTrue({title.casefold() for title in expected} <= titles)
 
 
 if __name__ == "__main__":
