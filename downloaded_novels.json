@@ -164,6 +164,24 @@
       ]
     },
     {
+      "url": "https://novelfull.com/everyone-has-four-skills.html",
+      "title": "Everyone Has Four Skills",
+      "author": "Li Xinsui",
+      "downloads": [
+        {
+          "range": "all",
+          "status": "complete",
+          "chapter_count": 615,
+          "run_id": 42513475192,
+          "run_url": "https://github.com/RichardDaffern/Novel_Library/actions/runs/42513475192",
+          "artifact_id": 13653765829,
+          "artifact_url": "https://github.com/RichardDaffern/Novel_Library/actions/runs/42513475192/artifacts/13653765829",
+          "completed_at_utc": "2026-11-09T06:13:54Z",
+          "expires_at_utc": "2026-11-16T06:13:54Z"
+        }
+      ]
+    },
+    {
       "url": "https://novelfull.com/from-soldier-to-officer-a-game-addicts-journey.html",
       "title": "From Soldier to Officer: A Game Addict's Journey",
       "author": "Song Of Special Troops",
