@@ -560,6 +560,24 @@
       ]
     },
     {
+      "url": "https://novelfull.com/legend-of-ling-tian.html",
+      "title": "Legend of Ling Tian",
+      "author": "Fengling Tianxia",
+      "downloads": [
+        {
+          "range": "all",
+          "status": "complete",
+          "chapter_count": 713,
+          "run_id": 42513431015,
+          "run_url": "https://github.com/RichardDaffern/Novel_Library/actions/runs/42513431015",
+          "artifact_id": 13655317054,
+          "artifact_url": "https://github.com/RichardDaffern/Novel_Library/actions/runs/42513431015/artifacts/13655317054",
+          "completed_at_utc": "2026-11-09T06:57:51Z",
+          "expires_at_utc": "2026-11-16T06:57:51Z"
+        }
+      ]
+    },
+    {
       "url": "https://novelfull.com/lord-of-all-realms.html",
       "title": "Lord of All Realms",
       "author": "Ni Cang Tian",
