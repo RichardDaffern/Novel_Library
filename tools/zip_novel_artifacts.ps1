@@ -22,10 +22,10 @@ function Get-ValidBook([string]$sourceDirectory, [string]$novelUrl) {
         if (-not (Test-Path -LiteralPath $manifest -PathType Leaf) -or -not (Test-Path -LiteralPath $epub -PathType Leaf)) { continue }
         try {
             $meta = Get-Content -LiteralPath $file.FullName -Raw -Encoding UTF8 | ConvertFrom-Json
-            if ((Get-NovelKey ([string]$meta.source_url)) -ne $wanted) { continue }
+            if ((Get-NovelKey ([string]$meta.source_url)) -ne $wanted) { Write-Warning "Skipping unrelated book in $($dir): $($meta.source_url)"; continue }
             $chapterList = @(Get-Content -LiteralPath $manifest -Raw -Encoding UTF8 | ConvertFrom-Json)
-            if ([int]$meta.chapter_count -lt 1 -or $chapterList.Count -ne [int]$meta.chapter_count) { continue }
-            if ((Get-Item -LiteralPath $epub).Length -lt 100) { continue }
+            if ([int]$meta.chapter_count -lt 1 -or $chapterList.Count -ne [int]$meta.chapter_count) { Write-Warning "Invalid manifest size for $($dir): expected $($meta.chapter_count), got $($chapterList.Count)"; continue }
+            if ((Get-Item -LiteralPath $epub).Length -lt 100) { Write-Warning "EPUB missing or too small in $($dir)"; continue }
             $seen = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
             $chapters = [System.Collections.Generic.List[string]]::new()
             $valid = $true
@@ -37,6 +37,7 @@ function Get-ValidBook([string]$sourceDirectory, [string]$novelUrl) {
                 $chapters.Add($path)
             }
             if ($valid) { $foundBooks += [pscustomobject]@{ Directory = $dir; Chapters = $chapters.ToArray(); Count = $chapterList.Count } }
+            else { Write-Warning "A chapter is missing or invalid in $($dir)" }
         } catch { Write-Warning "Ignoring invalid candidate at $($dir): $($_.Exception.Message)" }
     }
     if ($foundBooks.Count -ne 1) {
