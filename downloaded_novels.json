@@ -470,6 +470,24 @@
       ]
     },
     {
+      "url": "https://novelfull.com/invincible.html",
+      "title": "Invincible",
+      "author": "Shen Jian",
+      "downloads": [
+        {
+          "range": "all",
+          "status": "complete",
+          "chapter_count": 3753,
+          "run_id": 42513431015,
+          "run_url": "https://github.com/RichardDaffern/Novel_Library/actions/runs/42513431015",
+          "artifact_id": 13653866052,
+          "artifact_url": "https://github.com/RichardDaffern/Novel_Library/actions/runs/42513431015/artifacts/13653866052",
+          "completed_at_utc": "2026-11-09T06:14:23Z",
+          "expires_at_utc": "2026-11-16T06:14:23Z"
+        }
+      ]
+    },
+    {
       "url": "https://novelfull.com/king-of-gods.html",
       "title": "King of Gods",
       "author": "Fast Food Resturant",
