@@ -164,6 +164,24 @@
       ]
     },
     {
+      "url": "https://novelfull.com/emperors-domination.html",
+      "title": "Emperor’s Domination",
+      "author": "Yan Bi Xiao Sheng",
+      "downloads": [
+        {
+          "range": "all",
+          "status": "complete",
+          "chapter_count": 7212,
+          "run_id": 42513475192,
+          "run_url": "https://github.com/RichardDaffern/Novel_Library/actions/runs/42513475192",
+          "artifact_id": 13657994600,
+          "artifact_url": "https://github.com/RichardDaffern/Novel_Library/actions/runs/42513475192/artifacts/13657994600",
+          "completed_at_utc": "2026-11-09T08:16:29Z",
+          "expires_at_utc": "2026-11-16T08:16:29Z"
+        }
+      ]
+    },
+    {
       "url": "https://novelfull.com/everyone-has-four-skills.html",
       "title": "Everyone Has Four Skills",
       "author": "Li Xinsui",
