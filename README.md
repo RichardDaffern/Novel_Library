@@ -94,6 +94,25 @@ eligible chapters. In-app caching is different from an authorised EPUB/TXT
 export. A standalone chapter-export adapter would require an approved
 source/permission and a separate implementation and validation process.
 
+## Windows: one-click download of completed archives
+
+The [Download-All-Novels.cmd](Download-All-Novels.cmd) launcher retrieves the already-created, **full-novel** GitHub Actions artifacts listed in [downloaded_novels.json](downloaded_novels.json). It does **not** download chapters from source websites or trigger new Actions runs.
+
+1. Install [GitHub CLI](https://cli.github.com/) (for example, `winget install --id GitHub.cli --exact`).
+2. In a new terminal run `gh auth login` and authenticate with an account that can access the repository's Actions artifacts.
+3. Clone the repository or run `git pull` to get the latest files.
+4. Double-click `Download-All-Novels.cmd` from the repository root.
+
+The downloaded files appear in the ignored `Downloaded_Novels/` directory, in a separate folder for each title. The script reads the **current** index, selects the newest available full-book artifact per novel, avoids duplicate titles for repeat downloads and records completion markers to skip successful downloads on future runs. Unavailable/expired artifacts are reported in `Downloaded_Novels/failed-downloads.txt`. It cannot resurrect expired artifacts, and it does not bypass access controls. GitHub artifacts normally expire after seven days, so download promptly.
+
+For a quick one-book smoke test (after authenticating):
+
+~~~powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\download_all_artifacts.ps1 -Limit 1
+~~~
+
+To save to another folder, use `-Destination 'D:\Novels'`. You can rerun the same command after a network interruption; it skips completed folders. You must have the right to archive the underlying material. Novel contents are never committed to the repository.
+
 ## Downloaded-novel list
 
 View [DOWNLOADED_NOVELS.md](DOWNLOADED_NOVELS.md) for completed downloads. The index includes previously verified completed jobs, including the recovered Abe the Wizard entry from bulk run 42393126629. The registry is an index, **not permanent storage**: once an artifact expires, a normal rerun is allowed so the book can be archived again, subject to permission.
