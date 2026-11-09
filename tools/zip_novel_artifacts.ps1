@@ -13,7 +13,7 @@ function Get-NovelSlug([string]$url) {
     return [System.IO.Path]::GetFileNameWithoutExtension(([uri]$url).AbsolutePath).ToLowerInvariant()
 }
 function Get-ValidBook([string]$sourceDirectory, [string]$novelUrl) {
-    $matches = @()
+    $foundBooks = @()
     $wanted = Get-NovelKey $novelUrl
     foreach ($file in @(Get-ChildItem -LiteralPath $sourceDirectory -Recurse -Filter 'metadata.json' -File)) {
         $dir = $file.Directory.FullName
@@ -36,13 +36,13 @@ function Get-ValidBook([string]$sourceDirectory, [string]$novelUrl) {
                 if (-not (Test-Path -LiteralPath $path -PathType Leaf) -or (Get-Item -LiteralPath $path).Length -le 0) { $valid = $false; break }
                 $chapters.Add($path)
             }
-            if ($valid) { $matches += [pscustomobject]@{ Directory = $dir; Chapters = $chapters.ToArray(); Count = $chapterList.Count } }
+            if ($valid) { $foundBooks += [pscustomobject]@{ Directory = $dir; Chapters = $chapters.ToArray(); Count = $chapterList.Count } }
         } catch { Write-Warning "Ignoring invalid candidate at $($dir): $($_.Exception.Message)" }
     }
-    if ($matches.Count -ne 1) {
-        throw "Expected one complete book for '$novelUrl' under '$sourceDirectory'; found $($matches.Count). Unrelated books and partial downloads will not be included."
+    if ($foundBooks.Count -ne 1) {
+        throw "Expected one complete book for '$novelUrl' under '$sourceDirectory'; found $($foundBooks.Count). Unrelated books and partial downloads will not be included."
     }
-    return $matches[0]
+    return $foundBooks[0]
 }
 function Test-NovelZip([string]$path, [string]$novelUrl) {
     if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { return $false }
