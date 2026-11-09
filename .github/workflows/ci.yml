@@ -146,3 +146,14 @@ jobs:
         run: |
           python -u novel_downloader.py --self-test --chapter-range 3-4 --output-dir smoke
           python -c "import pathlib,json; p=pathlib.Path('smoke/fanficfare-smoke-test-chapters-0003-0004'); assert len(json.loads((p/'chapters.json').read_text()))==2; print('Windows chapters verified')"
+
+  zip-archive-smoke:
+    runs-on: windows-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate one-novel ZIP conversion (no external dependencies)
+        run: python -m unittest discover -s tests -p test_zip_packaging_windows.py -v
