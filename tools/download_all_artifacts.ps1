@@ -5,21 +5,54 @@ param(
     [string]$Repository = 'RichardDaffern/Novel_Library',
     [string]$Destination = (Join-Path (Split-Path -Parent $PSScriptRoot) 'Downloaded_Novels'),
     [ValidateRange(1,10)][int]$MaxAttempts = 3,
-    [ValidateRange(0,10000)][int]$Limit = 0
+    [ValidateRange(0,10000)][int]$Limit = 0,
+    [switch]$BrowserLogin
 )
 
 $ErrorActionPreference = 'Stop'
-
-if (-not (Get-Command gh -ErrorAction SilentlyContinue)) {
-    Write-Host 'GitHub CLI is missing. Install it with:' -ForegroundColor Yellow
-    Write-Host '  winget install --id GitHub.cli --exact'
-    Write-Host 'Open a NEW terminal afterwards, then run: gh auth login'
-    exit 1
+$repoRoot = Split-Path -Parent $PSScriptRoot
+$logFile = Join-Path $repoRoot 'download-last-run.log'
+$transcriptStarted = $false
+try {
+    Start-Transcript -Path $logFile -Force -ErrorAction Stop | Out-Null
+    $transcriptStarted = $true
+} catch {
+    Write-Warning "Could not start diagnostic log: $($_.Exception.Message)"
 }
+try {
+    Write-Host "Log file: $logFile"
+if (-not (Get-Command gh -ErrorAction SilentlyContinue)) {
+    throw "GitHub CLI (gh) is not installed or not on PATH. Run winget install --id GitHub.cli --exact and open a new terminal."
+}
+if ($BrowserLogin) {
+    Write-Host "Starting GitHub browser sign-in. Follow the one-time code shown here." -ForegroundColor Cyan
+    & gh auth login --web --clipboard --skip-ssh-key
+    if ($LASTEXITCODE -ne 0) { throw "GitHub browser sign-in was cancelled or unsuccessful." }
+}
+
 & gh auth status *> $null
 if ($LASTEXITCODE -ne 0) {
-    Write-Host 'Please authenticate first: gh auth login' -ForegroundColor Yellow
-    exit 1
+    Write-Host "No working GitHub CLI authentication was detected." -ForegroundColor Yellow
+    $reply = Read-Host "Open browser-based GitHub sign-in now? [Y/n]"
+    if ([string]::IsNullOrWhiteSpace($reply) -or $reply -match '^(?i:y|yes)$') {
+        Write-Host 'GitHub CLI will display a one-time code and open your browser.'
+        & gh auth login --web --clipboard --skip-ssh-key
+        if ($LASTEXITCODE -ne 0) { throw "GitHub browser sign-in failed or was cancelled." }
+        & gh auth status *> $null
+        if ($LASTEXITCODE -ne 0) { throw "GitHub CLI still reports no working login." }
+    } else {
+        throw "No GitHub CLI login. Run 'gh auth login --web --clipboard' in a terminal to sign in."
+    }
+}
+
+# An account with read access (such as AdityaSreevatsaK) is sufficient.
+try {
+    $activeUser = & gh api user --jq .login 2>$null
+    if ($LASTEXITCODE -eq 0 -and $activeUser) {
+        Write-Host "Using GitHub account: $activeUser" -ForegroundColor Green
+    }
+} catch {
+    Write-Warning 'Could not identify active GitHub account; proceeding with existing credentials.'
 }
 
 # Fetch the current registry; its entries are links, not the files themselves.
@@ -28,8 +61,7 @@ try {
     $registry = Invoke-RestMethod -Uri $registryUrl -TimeoutSec 90
     if ($null -eq $registry.novels) { throw 'The registry has no novels property.' }
 } catch {
-    Write-Host "Could not read $registryUrl : $($_.Exception.Message)" -ForegroundColor Red
-    exit 1
+    throw "Could not read ${registryUrl}: $($_.Exception.Message)"
 }
 
 # Group by source URL, and prefer the newest complete full-book artifact.
@@ -60,10 +92,16 @@ Write-Host "Destination: $Destination"
 
 function Get-ArtifactInfo([long]$Id) {
     try {
-        $raw = & gh api "repos/$Repository/actions/artifacts/$Id" 2>$null
-        if ($LASTEXITCODE -ne 0 -or -not $raw) { return $null }
+        $raw = & gh api "repos/$Repository/actions/artifacts/$Id"
+        if ($LASTEXITCODE -ne 0 -or -not $raw) {
+            Write-Warning "GitHub API could not access artifact $Id. Check the GitHub account permissions above."
+            return $null
+        }
         return (($raw -join "`n") | ConvertFrom-Json)
-    } catch { return $null }
+    } catch {
+        Write-Warning "Artifact $Id lookup failed: $($_.Exception.Message)"
+        return $null
+    }
 }
 
 $success = 0
@@ -160,3 +198,16 @@ if ($failed.Count) {
     exit 2
 }
 exit 0
+} catch {
+    Write-Host ''
+    Write-Host "FATAL ERROR: $($_.Exception.Message)" -ForegroundColor Red
+    if ($_.InvocationInfo -and $_.InvocationInfo.PositionMessage) {
+        Write-Host $_.InvocationInfo.PositionMessage -ForegroundColor Red
+    }
+    Write-Host "Diagnostic log: $logFile" -ForegroundColor Yellow
+    exit 1
+} finally {
+    if ($transcriptStarted) {
+        try { Stop-Transcript | Out-Null } catch { }
+    }
+}
