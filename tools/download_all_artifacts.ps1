@@ -3,14 +3,24 @@
 [CmdletBinding()]
 param(
     [string]$Repository = 'RichardDaffern/Novel_Library',
-    [string]$Destination = (Join-Path (Split-Path -Parent $PSScriptRoot) 'Downloaded_Novels'),
+    [string]$Destination = '',
     [ValidateRange(1,10)][int]$MaxAttempts = 3,
     [ValidateRange(0,10000)][int]$Limit = 0,
-    [switch]$BrowserLogin
+    [switch]$BrowserLogin,
+    [switch]$CheckSetup
 )
 
 $ErrorActionPreference = 'Stop'
-$repoRoot = Split-Path -Parent $PSScriptRoot
+# PowerShell 5.1 evaluates parameter defaults before $PSScriptRoot is populated.
+# Calculate filesystem paths only after the param block has bound.
+$scriptPath = $MyInvocation.MyCommand.Path
+if ([string]::IsNullOrWhiteSpace($scriptPath)) {
+    throw 'Unable to determine downloader script path.'
+}
+$repoRoot = Split-Path -Parent (Split-Path -Parent $scriptPath)
+if ([string]::IsNullOrWhiteSpace($Destination)) {
+    $Destination = Join-Path $repoRoot 'Downloaded_Novels'
+}
 $logFile = Join-Path $repoRoot 'download-last-run.log'
 $transcriptStarted = $false
 try {
@@ -21,6 +31,11 @@ try {
 }
 try {
     Write-Host "Log file: $logFile"
+    if ($CheckSetup) {
+        # This runs with no network, GitHub account, or downloaded book required.
+        Write-Host "Startup self-check passed. Destination: $Destination"
+        return
+    }
 if (-not (Get-Command gh -ErrorAction SilentlyContinue)) {
     throw "GitHub CLI (gh) is not installed or not on PATH. Run winget install --id GitHub.cli --exact and open a new terminal."
 }
