@@ -107,6 +107,12 @@ The launcher saves a detailed local diagnostic transcript to `download-last-run.
 
 The downloaded files appear in the ignored `Downloaded_Novels/` directory, in a separate folder for each title. The script reads the **current** index, selects the newest available full-book artifact per novel, avoids duplicate titles for repeat downloads and records completion markers to skip successful downloads on future runs. Unavailable/expired artifacts are reported in `Downloaded_Novels/failed-downloads.txt`. It cannot resurrect expired artifacts, and it does not bypass access controls. GitHub artifacts normally expire after seven days, so download promptly.
 
+To verify the Windows launcher can resolve its folders without signing in or downloading anything:
+
+~~~powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\\tools\\download_all_artifacts.ps1 -CheckSetup
+~~~
+
 For a quick one-book smoke test (after authenticating):
 
 ~~~powershell
