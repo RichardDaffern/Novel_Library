@@ -13,3 +13,5 @@ smoke/
 *.pyc
 Downloaded_Novels/
 download-last-run.log
+Downloaded_Novels_Originals/
+Downloaded_Novels_Staging/

@@ -7,7 +7,10 @@ param(
     [ValidateRange(1,10)][int]$MaxAttempts = 3,
     [ValidateRange(0,10000)][int]$Limit = 0,
     [switch]$BrowserLogin,
-    [switch]$CheckSetup
+    [switch]$CheckSetup,
+    [switch]$RepackOnly,
+    [switch]$KeepOriginalFolders,
+    [string]$RegistryFile = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -18,6 +21,7 @@ if ([string]::IsNullOrWhiteSpace($scriptPath)) {
     throw 'Unable to determine downloader script path.'
 }
 $repoRoot = Split-Path -Parent (Split-Path -Parent $scriptPath)
+. (Join-Path $PSScriptRoot 'zip_novel_artifacts.ps1')
 if ([string]::IsNullOrWhiteSpace($Destination)) {
     $Destination = Join-Path $repoRoot 'Downloaded_Novels'
 }
@@ -36,6 +40,7 @@ try {
         Write-Host "Startup self-check passed. Destination: $Destination"
         return
     }
+if (-not $RepackOnly) {
 if (-not (Get-Command gh -ErrorAction SilentlyContinue)) {
     throw "GitHub CLI (gh) is not installed or not on PATH. Run winget install --id GitHub.cli --exact and open a new terminal."
 }
@@ -87,10 +92,16 @@ try {
     Write-Warning 'Could not identify active GitHub account; proceeding with existing credentials.'
 }
 
+}
+
 # Fetch the current registry; its entries are links, not the files themselves.
 $registryUrl = "https://raw.githubusercontent.com/$Repository/main/downloaded_novels.json"
 try {
-    $registry = Invoke-RestMethod -Uri $registryUrl -TimeoutSec 90
+    if ($RegistryFile) {
+        $registry = Get-Content -LiteralPath $RegistryFile -Raw -Encoding UTF8 | ConvertFrom-Json
+    } else {
+        $registry = Invoke-RestMethod -Uri $registryUrl -TimeoutSec 90
+    }
     if ($null -eq $registry.novels) { throw 'The registry has no novels property.' }
 } catch {
     throw "Could not read ${registryUrl}: $($_.Exception.Message)"
@@ -136,6 +147,24 @@ function Get-ArtifactInfo([long]$Id) {
     }
 }
 
+# Already-downloaded folders from older versions can be converted without
+# downloading again. Keep the original extraction as a reversible backup.
+$backupRoot = $Destination + '_Originals'
+$stagingRoot = $Destination + '_Staging'
+function Preserve-Legacy([string]$path) {
+    if ($KeepOriginalFolders -or -not (Test-Path -LiteralPath $path -PathType Container)) { return }
+    New-Item -ItemType Directory -Path $backupRoot -Force | Out-Null
+    $name = Split-Path -Leaf $path
+    $backup = Join-Path $backupRoot $name
+    $suffix = 1
+    while (Test-Path -LiteralPath $backup) {
+        $backup = Join-Path $backupRoot ("$name-$suffix")
+        $suffix++
+    }
+    Move-Item -LiteralPath $path -Destination $backup
+    Write-Host "  Existing extracted files preserved at: $backup"
+}
+
 $success = 0
 $skipped = 0
 $failed = [System.Collections.Generic.List[string]]::new()
@@ -143,78 +172,94 @@ $position = 0
 
 foreach ($book in $books) {
     $position++
-    Write-Host "`n[$position/$($books.Count)] $($book.Title)" -ForegroundColor Cyan
+    Write-Host ''
+    Write-Host "[$position/$($books.Count)] $($book.Title)" -ForegroundColor Cyan
     $name = [regex]::Replace($book.Title, '[<>:"/\\|?*\x00-\x1F]', '_').Trim().TrimEnd('.')
     if ([string]::IsNullOrWhiteSpace($name)) { $name = "Novel_$position" }
     if ($name.Length -gt 95) { $name = $name.Substring(0,95).Trim().TrimEnd('.') }
-    # Prefix Windows reserved device names so the path remains valid.
     if ($name -match '^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])$') { $name = "Novel_$name" }
-    $target = Join-Path $Destination $name
-    $marker = Join-Path $target '.download-complete.json'
-    $partial = "$target.partial"
-
-    if (Test-Path -LiteralPath $marker) {
-        Write-Host '  Already downloaded; skipping.'
-        $skipped++
-        continue
-    }
-    if (Test-Path -LiteralPath $target) {
-        Write-Warning "The directory already exists without a completion marker: $target"
-        Write-Warning 'Leaving it untouched. Rename it before retrying this novel.'
-        $failed.Add($book.Title)
-        continue
-    }
-
-    $gotIt = $false
+    $legacy = Join-Path $Destination $name
+    $completed = $false
     $candidates = @($book.Candidates | Sort-Object -Property @{
         Expression = { [datetime]$_.completed_at_utc }; Descending = $true
     })
+
+    # A verified ZIP can be reused regardless of which run produced it.
     foreach ($candidate in $candidates) {
-        if ($candidate.expires_at_utc -and
-            [datetime]$candidate.expires_at_utc -le [datetime]::UtcNow) { continue }
-        $artifact = Get-ArtifactInfo ([long]$candidate.artifact_id)
+        $zipPath = Join-Path $Destination ("novel-$($candidate.artifact_id).zip")
+        if (Test-NovelZip $zipPath $book.Url) {
+            Write-Host "  Already archived: $([System.IO.Path]::GetFileName($zipPath))"
+            Preserve-Legacy $legacy
+            $skipped++; $completed = $true; break
+        }
+        if (Test-Path -LiteralPath $zipPath) {
+            Write-Warning "Existing ZIP is invalid or belongs to another novel: $zipPath"
+        }
+    }
+    if ($completed) { continue }
+
+    # Convert an old download from the previous folder-based version.
+    if (Test-Path -LiteralPath $legacy -PathType Container) {
+        $receiptPath = Join-Path $legacy '.download-complete.json'
+        if (Test-Path -LiteralPath $receiptPath -PathType Leaf) {
+            try {
+                $receipt = Get-Content -LiteralPath $receiptPath -Raw -Encoding UTF8 | ConvertFrom-Json
+                $artifactId = [long]$receipt.artifact_id
+                $knownIds = @($candidates | ForEach-Object { [long]$_.artifact_id })
+                if ($knownIds -notcontains $artifactId) {
+                    throw "Old folder receipt artifact $artifactId is not listed for this book."
+                }
+                $zipPath = Join-Path $Destination ("novel-$artifactId.zip")
+                New-NovelZip $legacy $book.Url $zipPath
+                Preserve-Legacy $legacy
+                $success++; $completed = $true
+            } catch {
+                Write-Warning "Existing download could not be repacked: $($_.Exception.Message)"
+            }
+        }
+    }
+    if ($completed) { continue }
+    if ($RepackOnly) {
+        Write-Warning 'No complete local folder to repackage; nothing downloaded.'
+        $failed.Add($book.Title)
+        continue
+    }
+
+    foreach ($candidate in $candidates) {
+        if ($candidate.expires_at_utc -and [datetime]$candidate.expires_at_utc -le [datetime]::UtcNow) { continue }
+        $artifactId = [long]$candidate.artifact_id
+        $zipPath = Join-Path $Destination ("novel-$artifactId.zip")
+        if (Test-Path -LiteralPath $zipPath) { continue }
+        $artifact = Get-ArtifactInfo $artifactId
         if ($null -eq $artifact -or $artifact.expired -or
             [string]::IsNullOrWhiteSpace([string]$artifact.name) -or
-            [long]$artifact.id -ne [long]$candidate.artifact_id) {
-            Write-Host "  Artifact $($candidate.artifact_id) is unavailable or expired."
+            [long]$artifact.id -ne $artifactId) {
+            Write-Warning "Artifact $artifactId is unavailable or expired."
             continue
         }
-        for ($attempt=1; $attempt -le $MaxAttempts; $attempt++) {
-            if (Test-Path -LiteralPath $partial) {
-                Remove-Item -LiteralPath $partial -Recurse -Force
-            }
-            New-Item -ItemType Directory -Path $partial -Force | Out-Null
-            Write-Host "  Downloading artifact $($candidate.artifact_id) (attempt $attempt/$MaxAttempts)"
-            & gh run download ([string]$candidate.run_id) --repo $Repository --name ([string]$artifact.name) --dir $partial
-            $status = $LASTEXITCODE
-            $payload = @(Get-ChildItem -LiteralPath $partial -File -Recurse |
-                Where-Object { $_.Extension -in @('.epub', '.zip') })
-            if ($status -eq 0 -and $payload.Count -gt 0) {
-                Move-Item -LiteralPath $partial -Destination $target
-                $receipt = [ordered]@{
-                    title = $book.Title
-                    source_url = $book.Url
-                    artifact_id = [long]$candidate.artifact_id
-                    run_id = [long]$candidate.run_id
-                    downloaded_utc = [datetime]::UtcNow.ToString('o')
+        $stage = Join-Path $stagingRoot ("artifact-$artifactId")
+        for ($attempt = 1; $attempt -le $MaxAttempts; $attempt++) {
+            try {
+                if (Test-Path -LiteralPath $stage) {
+                    Remove-Item -LiteralPath $stage -Recurse -Force
                 }
-                $receipt | ConvertTo-Json | Set-Content -LiteralPath $marker -Encoding UTF8
-                $success++
-                $gotIt = $true
-                Write-Host '  Saved EPUB/ZIP archive.' -ForegroundColor Green
-                break
+                New-Item -ItemType Directory -Path $stage -Force | Out-Null
+                Write-Host "  Downloading artifact $artifactId (attempt $attempt/$MaxAttempts)"
+                & gh run download ([string]$candidate.run_id) --repo $Repository --name ([string]$artifact.name) --dir $stage
+                if ($LASTEXITCODE -ne 0) { throw "GitHub CLI returned exit code $LASTEXITCODE" }
+                New-NovelZip $stage $book.Url $zipPath
+                Remove-Item -LiteralPath $stage -Recurse -Force
+                $success++; $completed = $true; break
+            } catch {
+                Write-Warning "Attempt $attempt failed: $($_.Exception.Message)"
+                if ($attempt -lt $MaxAttempts) { Start-Sleep -Seconds (3 * $attempt) }
             }
-            Write-Warning "Attempt $attempt failed or did not contain an EPUB/ZIP file."
-            if ($attempt -lt $MaxAttempts) { Start-Sleep -Seconds (3 * $attempt) }
         }
-        if (Test-Path -LiteralPath $partial) {
-            Remove-Item -LiteralPath $partial -Recurse -Force
-        }
-        if ($gotIt) { break }
+        if ($completed) { break }
     }
-    if (-not $gotIt) {
-        Write-Warning "No available full-book artifact succeeded for $($book.Title)"
+    if (-not $completed) {
         $failed.Add($book.Title)
+        Write-Warning "Failed to produce a verified ZIP for $($book.Title). Existing data was not deleted."
     }
 }
 
@@ -224,7 +269,7 @@ if ($failed.Count) {
 } elseif (Test-Path -LiteralPath $failureLog) {
     Remove-Item -LiteralPath $failureLog -Force
 }
-Write-Host "`nFinished: downloaded=$success, already present=$skipped, failed/unavailable=$($failed.Count)." -ForegroundColor Cyan
+Write-Host "`nFinished: ZIPs created=$success, already archived=$skipped, failed/unavailable=$($failed.Count)." -ForegroundColor Cyan
 if ($failed.Count) {
     Write-Warning "See $failureLog ; rerun this launcher to retry."
     exit 2
