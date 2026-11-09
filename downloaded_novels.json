@@ -1165,6 +1165,24 @@
       ]
     },
     {
+      "url": "https://novelfull.com/the-great-thief.html",
+      "title": "The Great Thief",
+      "author": "大盗贼",
+      "downloads": [
+        {
+          "range": "all",
+          "status": "complete",
+          "chapter_count": 1976,
+          "run_id": 42513348683,
+          "run_url": "https://github.com/RichardDaffern/Novel_Library/actions/runs/42513348683",
+          "artifact_id": 13656896239,
+          "artifact_url": "https://github.com/RichardDaffern/Novel_Library/actions/runs/42513348683/artifacts/13656896239",
+          "completed_at_utc": "2026-11-09T07:30:13Z",
+          "expires_at_utc": "2026-11-16T07:30:13Z"
+        }
+      ]
+    },
+    {
       "url": "https://novelfull.com/the-human-emperor.html",
       "title": "The Human Emperor",
       "author": "Huangfu Qi",
