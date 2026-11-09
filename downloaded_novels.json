@@ -254,6 +254,24 @@
       ]
     },
     {
+      "url": "https://novelfull.com/great-demon-king.html",
+      "title": "Great Demon King",
+      "author": "Ni Cang Tian",
+      "downloads": [
+        {
+          "range": "all",
+          "status": "complete",
+          "chapter_count": 1028,
+          "run_id": 42513447856,
+          "run_url": "https://github.com/RichardDaffern/Novel_Library/actions/runs/42513447856",
+          "artifact_id": 13650731871,
+          "artifact_url": "https://github.com/RichardDaffern/Novel_Library/actions/runs/42513447856/artifacts/13650731871",
+          "completed_at_utc": "2026-11-09T04:51:47Z",
+          "expires_at_utc": "2026-11-16T04:51:47Z"
+        }
+      ]
+    },
+    {
       "url": "https://novelfull.com/i-alone-level-up.html",
       "title": "I Alone Level-Up",
       "author": "Chugong",
