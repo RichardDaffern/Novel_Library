@@ -416,6 +416,24 @@
       ]
     },
     {
+      "url": "https://novelfull.com/medical-master.html",
+      "title": "Medical Master",
+      "author": "Walk The World",
+      "downloads": [
+        {
+          "range": "all",
+          "status": "complete",
+          "chapter_count": 2028,
+          "run_id": 42513414021,
+          "run_url": "https://github.com/RichardDaffern/Novel_Library/actions/runs/42513414021",
+          "artifact_id": 13645342551,
+          "artifact_url": "https://github.com/RichardDaffern/Novel_Library/actions/runs/42513414021/artifacts/13645342551",
+          "completed_at_utc": "2026-11-09T02:29:39Z",
+          "expires_at_utc": "2026-11-16T02:29:39Z"
+        }
+      ]
+    },
+    {
       "url": "https://novelfull.com/my-genes-can-evolve-limitlessly.html",
       "title": "My Genes Can Evolve Limitlessly",
       "author": "Rainy Blue Skies",
