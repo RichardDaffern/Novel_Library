@@ -125,6 +125,7 @@ jobs:
           $smokeTools = Join-Path $smokeRoot 'tools'
           New-Item -ItemType Directory -Force -Path $smokeTools | Out-Null
           Copy-Item 'tools/download_all_artifacts.ps1' (Join-Path $smokeTools 'download_all_artifacts.ps1')
+          Copy-Item 'tools/zip_novel_artifacts.ps1' (Join-Path $smokeTools 'zip_novel_artifacts.ps1')
           $smokeScript = Join-Path $smokeTools 'download_all_artifacts.ps1'
           $startup = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $smokeScript -BrowserLogin -CheckSetup 2>&1 | Out-String
           if ($LASTEXITCODE -ne 0) { throw "PowerShell 5.1 failed at argument binding/startup: $startup" }
