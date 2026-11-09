@@ -87,6 +87,19 @@ jobs:
           cache: pip
       - run: python -m pip install -r requirements.txt
       - run: python -m unittest discover -s tests -v
+      - name: Validate one-click downloader syntax and launcher path
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path 'tools/download_all_artifacts.ps1').Path, [ref]$tokens, [ref]$errors) | Out-Null
+          if ($errors.Count -gt 0) {
+            $errors | ForEach-Object { Write-Error $_.Message }
+            throw 'PowerShell syntax validation failed'
+          }
+          if (-not (Test-Path 'Download-All-Novels.cmd')) { throw 'Windows launcher is missing' }
+          if (-not ((Get-Content 'Download-All-Novels.cmd' -Raw) -like '*tools\download_all_artifacts.ps1*')) { throw 'Launcher does not invoke downloader' }
+          Write-Host 'Windows artifact downloader syntax and launcher verified (no network requests)'
       - name: Verify chunked EPUB assembly on Windows (offline)
         shell: pwsh
         run: |
