@@ -104,14 +104,96 @@ class SynopsisRepairTests(unittest.TestCase):
             repair(original, root / "out", fetcher=fetch)
             self.assertEqual(calls, [SOURCE])
 
-    def test_output_collision_does_not_overwrite_original_or_existing_copy(self):
+    def test_existing_copy_mode_never_overwrites_existing_output(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
             original = make_novel_zip(root)
-            with self.assertRaisesRegex(SynopsisError, "must not overwrite"):
-                repair(original, root, provided=DESCRIPTION)
-            repair(original, root / "out", provided=DESCRIPTION)
+            before = original.read_bytes()
+            self.assertIn("saved", repair(original, root / "out", provided=DESCRIPTION))
+            saved = (root / "out" / original.name).read_bytes()
             self.assertIn("already exists", repair(original, root / "out", provided=DESCRIPTION))
+            self.assertEqual(saved, (root / "out" / original.name).read_bytes())
+            self.assertEqual(before, original.read_bytes())
+
+    def test_atomic_in_place_overwrite_preserves_every_chapter_and_manifest(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            original = make_novel_zip(root)
+            with ZipFile(original) as existing:
+                member_before = {
+                    name: existing.read(name)
+                    for name in existing.namelist()
+                    if not name.endswith("/metadata.json") and not name.endswith("/source.epub")
+                }
+            status = repair(original, provided=DESCRIPTION)
+            self.assertIn("replaced original", status)
+            self.assertTrue(original.is_file())
+            with ZipFile(original) as corrected:
+                self.assertIsNone(corrected.testzip())
+                for name, content in member_before.items():
+                    self.assertEqual(corrected.read(name), content)
+                metadata = json.loads(corrected.read("synthetic-villain/metadata.json"))
+                self.assertEqual(metadata["description"], DESCRIPTION)
+                self.assertEqual(metadata["synopsis"], DESCRIPTION)
+                epub = corrected.read("synthetic-villain/source.epub")
+                self.assertEqual(read_epub_description(epub)[1], DESCRIPTION)
+            self.assertFalse((root / "Synopsis_Repaired").exists())
+            self.assertEqual(list(root.glob(".synopsis-*.zip")), [])
+            self.assertIn("synopsis already complete", repair(original))
+
+    def test_validation_failure_keeps_original_unchanged_and_deletes_staged_file(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            original = make_novel_zip(root)
+            before = original.read_bytes()
+            with patch("tools.repair_synopsis._verify_repair",
+                       side_effect=SynopsisError("simulated checksum mismatch")):
+                with self.assertRaisesRegex(SynopsisError, "checksum mismatch"):
+                    repair(original, provided=DESCRIPTION)
+            self.assertEqual(original.read_bytes(), before)
+            self.assertEqual(list(root.glob(".synopsis-*.zip")), [])
+
+    def test_replace_failure_keeps_original_and_removes_temp_zip(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            original = make_novel_zip(root)
+            before = original.read_bytes()
+            with patch("tools.repair_synopsis.os.replace",
+                       side_effect=PermissionError("file is locked")):
+                with self.assertRaisesRegex(PermissionError, "locked"):
+                    repair(original, provided=DESCRIPTION)
+            self.assertEqual(original.read_bytes(), before)
+            self.assertEqual(list(root.glob(".synopsis-*.zip")), [])
+
+    def test_external_modification_aborts_before_replacement(self):
+        import os
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            original = make_novel_zip(root)
+            def metadata_lookup(_):
+                current = original.stat()
+                os.utime(original, ns=(current.st_atime_ns, current.st_mtime_ns - 1_000_000_000))
+                return DESCRIPTION
+            with self.assertRaisesRegex(SynopsisError, "changed during repair"):
+                repair(original, fetcher=metadata_lookup)
+            with ZipFile(original) as z:
+                self.assertNotIn("description", json.loads(
+                    z.read("synthetic-villain/metadata.json")))
+            self.assertEqual(list(root.glob(".synopsis-*.zip")), [])
+
+    def test_cli_apply_defaults_to_overwrite_not_a_subfolder(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            original = make_novel_zip(root)
+            rc = main([
+                "--zip", str(original), "--description", DESCRIPTION, "--apply"
+            ])
+            self.assertEqual(rc, 0)
+            self.assertTrue(original.is_file())
+            self.assertEqual(archive_info(original)[4], DESCRIPTION)
+            self.assertEqual(len(list(root.glob("*.zip"))), 1)
+            self.assertFalse((root / "Synopsis_Repaired").exists())
 
     def test_rejects_unapproved_source_site_for_automatic_lookup(self):
         with self.assertRaises(SynopsisError):
