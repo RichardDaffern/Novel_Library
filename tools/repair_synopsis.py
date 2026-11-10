@@ -155,9 +155,10 @@ def _verify_repair(original_path: Path, candidate_path: Path, meta_path: str,
                 ZipFile(BytesIO(candidate.read(epub_path))) as new_epub:
             if old_epub.namelist() != new_epub.namelist():
                 raise SynopsisError("Repair changed EPUB's file list")
-            opf_path = read_epub_description(new_epub.fp.getvalue() if isinstance(
-                new_epub.fp, BytesIO) else candidate.read(epub_path))[0]
-            if read_epub_description(candidate.read(epub_path))[1] != synopsis:
+            opf_path, verified_synopsis, _, _ = read_epub_description(
+                candidate.read(epub_path)
+            )
+            if verified_synopsis != synopsis:
                 raise SynopsisError("Repaired EPUB synopsis verification failed")
             for name in old_epub.namelist():
                 if name != opf_path and old_epub.read(name) != new_epub.read(name):
