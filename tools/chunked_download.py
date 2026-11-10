@@ -219,7 +219,8 @@ def fetch_piece(url: str, key: str, first: int, last: int, folder: Path,
     print(f"VERIFIED completed chapter batch {first}-{last}", flush=True)
 
 
-def _epub(book: Path, rows: list[dict], title: str, author: str, language: str, url: str) -> None:
+def _epub(book: Path, rows: list[dict], title: str, author: str, language: str, url: str,
+          description: str = "") -> None:
     def chapter_xhtml(chapter: dict) -> str:
         content = (book / chapter["file"]).read_text(encoding="utf-8")
         lines = content.split("\n", 2)
@@ -247,6 +248,7 @@ def _epub(book: Path, rows: list[dict], title: str, author: str, language: str, 
         '<metadata xmlns:dc="http://purl.org/dc/elements/1.1/">'
         f'<dc:title>{escape(title)}</dc:title><dc:creator>{escape(author)}</dc:creator>'
         f'<dc:language>{escape(language or "en")}</dc:language>'
+        + (f"<dc:description>{escape(description)}</dc:description>" if description else "") +
         f'<dc:identifier id="bookid">urn:uuid:{uuid.uuid5(uuid.NAMESPACE_URL, url)}</dc:identifier>'
         '</metadata><manifest><item id="toc" href="toc.ncx" '
         'media-type="application/x-dtbncx+xml" />'
@@ -325,10 +327,20 @@ def assemble(plan: dict, chunks_dir: Path, output_dir: Path) -> Path:
     title = assembled_title(first_metadata.get("title") or book.name, plan["pieces"][0])
     author = first_metadata.get("author") or ""
     language = first_metadata.get("language") or "en"
-    _epub(book, merged, title, author, language, url)
+    # Range EPUBs produced by FanFicFare can already contain the original
+    # synopsis. Preserve the first non-empty description across all ranges.
+    description = next(
+        (str(value).strip() for meta in titles
+         for value in (meta.get("description") or meta.get("synopsis"),)
+         if isinstance(value, str) and value.strip()),
+        "",
+    )
+    _epub(book, merged, title, author, language, url, description=description)
     epub_metadata, from_epub = epub_chapters(book / "source.epub")
     if len(from_epub) != len(merged):
         raise ValueError("Combined EPUB does not contain every selected chapter")
+    if description and epub_metadata.get("description") != description:
+        raise ValueError("Combined EPUB lost its synopsis metadata")
     metadata = {
         "title": title, "author": author, "language": language,
         "source_url": url, "chapter_count": len(merged),
@@ -336,6 +348,9 @@ def assemble(plan: dict, chunks_dir: Path, output_dir: Path) -> Path:
         "format": "epub", "chapter_files": "UTF-8 TXT",
         "assembled_from_batches": len(plan["pieces"]),
     }
+    if description:
+        metadata["description"] = description
+        metadata["synopsis"] = description
     (book / "metadata.json").write_text(json.dumps(metadata, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     (book / "chapters.json").write_text(json.dumps(merged, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(f"ASSEMBLED {len(merged)} verified TXT chapters and EPUB in {book}", flush=True)
