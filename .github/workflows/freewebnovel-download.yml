@@ -1,0 +1,270 @@
+name: FreeWebNovel - Download
+
+on:
+  workflow_dispatch:
+    inputs:
+      novel_url:
+        description: 'FreeWebNovel book URL (https://freewebnovel.com/novel/...)'
+        required: true
+        type: string
+      chapter_range:
+        description: 'Optional inclusive chapter range (e.g. 1-30; blank for all)'
+        required: false
+        type: string
+      force:
+        description: 'Force fresh download even when an archive already exists'
+        required: false
+        type: boolean
+        default: false
+
+
+  workflow_call:
+    inputs:
+      novel_url:
+        description: 'FreeWebNovel book URL to download in bounded chapter batches'
+        required: true
+        type: string
+      chapter_range:
+        description: 'Optional inclusive chapter range; blank means all'
+        required: false
+        type: string
+        default: ''
+      force:
+        description: 'Force fresh download and bypass reusable cached ranges'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: read
+
+# Different novels may run together. Duplicate runs for the same exact URL
+# queue rather than interrupting ongoing downloads.
+concurrency:
+  group: freewebnovel-download-${{ inputs.novel_url }}
+  cancel-in-progress: false
+  queue: max
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    outputs:
+      normalized_url: ${{ steps.source.outputs.url }}
+      skip: ${{ steps.registry.outputs.skip }}
+      matrix: ${{ steps.make_plan.outputs.matrix }}
+      parallelism: ${{ steps.make_plan.outputs.parallelism }}
+      key: ${{ steps.make_plan.outputs.key }}
+      first: ${{ steps.make_plan.outputs.first }}
+      last: ${{ steps.make_plan.outputs.last }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - name: Validate and normalise FreeWebNovel book URL
+        id: source
+        env:
+          NOVEL_URL: ${{ inputs.novel_url }}
+        run: |
+          python - <<'PY'
+          import os
+          import re
+          from urllib.parse import urlsplit
+          raw = os.environ['NOVEL_URL']
+          parts = urlsplit(raw)
+          match = re.fullmatch(r'/novel/([a-z0-9]+(?:-[a-z0-9]+)*)/?', parts.path)
+          if (parts.scheme != 'https' or parts.hostname not in
+              ('freewebnovel.com', 'www.freewebnovel.com') or
+              parts.port is not None or parts.username or parts.password or
+              parts.query or parts.fragment or not match):
+              raise SystemExit('Use https://freewebnovel.com/novel/book-slug')
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as output:
+              output.write('url=https://freewebnovel.com/novel/' + match.group(1) + '\n')
+          PY
+
+      - name: Check registry before doing any downloading
+        id: registry
+        env:
+          NOVEL_URL: ${{ steps.source.outputs.url }}
+          CHAPTER_RANGE: ${{ inputs.chapter_range }}
+          FORCE: ${{ inputs.force }}
+        run: |
+          args=(python tools/download_registry.py check --url "$NOVEL_URL" --chapter-range "$CHAPTER_RANGE")
+          if [[ "$FORCE" == "true" ]]; then args+=(--force); fi
+          "${args[@]}"
+
+      - name: Already downloaded
+        if: steps.registry.outputs.skip == 'true'
+        run: |
+          echo "::notice::Already downloaded. Select Force to download again."
+          echo "The requested novel and range are already in an available GitHub Actions artifact." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Install FreeWebNovel dependencies
+        if: steps.registry.outputs.skip != 'true'
+        run: python -m pip install -r requirements.txt
+
+      - name: Index chapters and calculate batches
+        id: make_plan
+        if: steps.registry.outputs.skip != 'true'
+        env:
+          NOVEL_URL: ${{ steps.source.outputs.url }}
+          CHAPTER_RANGE: ${{ inputs.chapter_range }}
+        run: |
+          python -u -m tools.freewebnovel_chunks plan \
+            --url "$NOVEL_URL" --chapter-range "$CHAPTER_RANGE" \
+            --chunk-size 50 --plan-file chapter_plan.json
+
+      - name: Save chapter plan for final assembly
+        if: steps.registry.outputs.skip != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: chapter-plan-${{ github.run_id }}-${{ steps.make_plan.outputs.key }}
+          path: chapter_plan.json
+          retention-days: 7
+          if-no-files-found: error
+
+  chapter-batches:
+    needs: prepare
+    if: needs.prepare.outputs.skip != 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      max-parallel: ${{ fromJSON(needs.prepare.outputs.parallelism) }}
+      matrix: ${{ fromJson(needs.prepare.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Install downloader dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Recover previous complete batch or download range
+        env:
+          NOVEL_URL: ${{ needs.prepare.outputs.normalized_url }}
+          FORCE: ${{ inputs.force }}
+          GH_TOKEN: ${{ github.token }}
+          PYTHONUNBUFFERED: '1'
+        timeout-minutes: 75
+        run: |
+          args=(python -u -m tools.freewebnovel_chunks fetch
+            --url "$NOVEL_URL"
+            --key "${{ needs.prepare.outputs.key }}"
+            --start "${{ matrix.start }}"
+            --end "${{ matrix.end }}"
+            --timeout-minutes 65
+            --scratch-dir scratch
+            --output-dir part)
+          if [[ "$FORCE" == "true" ]]; then args+=(--force); fi
+          "${args[@]}"
+
+      - name: Upload verified chapter batch
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.name }}
+          path: part/
+          retention-days: 7
+          if-no-files-found: error
+          compression-level: 6
+
+      - name: Preserve checkpoint files when a batch fails
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: partial-batch-${{ github.run_id }}-${{ needs.prepare.outputs.key }}-${{ matrix.start }}-${{ matrix.end }}
+          path: scratch/
+          retention-days: 7
+          if-no-files-found: ignore
+
+  assemble:
+    needs: [prepare, chapter-batches]
+    if: needs.prepare.outputs.skip != 'true' && needs.chapter-batches.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Install EPUB parser dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Restore chapter plan
+        uses: actions/download-artifact@v4
+        with:
+          name: chapter-plan-${{ github.run_id }}-${{ needs.prepare.outputs.key }}
+          path: .
+
+      - name: Retrieve every complete chapter batch
+        uses: actions/download-artifact@v4
+        with:
+          pattern: chapter-batch-${{ needs.prepare.outputs.key }}-*
+          path: completed_batches
+          merge-multiple: false
+
+      - name: Assemble and validate combined EPUB and TXT chapters
+        env:
+          NOVEL_URL: ${{ needs.prepare.outputs.normalized_url }}
+        run: |
+          python -u -m tools.freewebnovel_chunks assemble \
+            --url "$NOVEL_URL" \
+            --plan-file chapter_plan.json \
+            --chunks-dir completed_batches --output-dir downloads
+
+      - name: Upload complete novel archive
+        id: upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: novel-${{ github.run_id }}-${{ needs.prepare.outputs.key }}
+          path: downloads/
+          retention-days: 7
+          if-no-files-found: error
+          compression-level: 6
+
+
+      - name: Regenerate registry from latest main and automatically merge PR
+        env:
+          NOVEL_URL: ${{ needs.prepare.outputs.normalized_url }}
+          CHAPTER_RANGE: ${{ inputs.chapter_range }}
+          ARTIFACT_ID: ${{ steps.upload.outputs.artifact-id }}
+          ARTIFACT_URL: ${{ steps.upload.outputs.artifact-url }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python -u -m tools.publish_registry \
+            --url "$NOVEL_URL" \
+            --chapter-range "$CHAPTER_RANGE" \
+            --run-id "$GITHUB_RUN_ID" \
+            --artifact-id "$ARTIFACT_ID" \
+            --artifact-url "$ARTIFACT_URL" \
+            --downloads-dir downloads
+
+  report:
+    needs: [prepare, chapter-batches, assemble]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Report completion or recoverable failed batches
+        env:
+          PREPARE: ${{ needs.prepare.result }}
+          BATCHES: ${{ needs.chapter-batches.result }}
+          ASSEMBLY: ${{ needs.assemble.result }}
+        run: |
+          echo "## Download status" >> "$GITHUB_STEP_SUMMARY"
+          echo "Indexing: $PREPARE; chapter batches: $BATCHES; assembly: $ASSEMBLY" >> "$GITHUB_STEP_SUMMARY"
+          if [[ "$PREPARE" == "failure" || "$BATCHES" == "failure" || "$ASSEMBLY" == "failure" ]]; then
+            echo "::error::One or more chapter batches failed. Verified completed batches can be reused on the next run. Partial checkpoints are saved as artifacts."
+            exit 1
+          fi

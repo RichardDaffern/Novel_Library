@@ -66,6 +66,57 @@ The bulk workflow checks the downloaded-novels registry once, removes duplicate 
 The overall bulk workflow reports failure if any novel fails; completed novels and their downloadable artifacts remain available. The workflows do not publish novel text or EPUBs in Git, and only authorised downloads should be submitted.
 
 
+
+## GitHub Actions: FreeWebNovel
+
+FreeWebNovel is a separate source, not a FanFicFare adapter. The existing
+NovelFull actions are unaffected. Its public Chapter 1 and 2 retrieval was
+verified locally against the novel **The First Order** on 10 November 2026.
+A completed whole-book FreeWebNovel download remains unverified until the
+dedicated Actions workflows are run against the live site.
+
+Two additional actions are available:
+
+- **FreeWebNovel - Download:** One public FreeWebNovel novel URL. Set
+  **Chapter range** to \`1-2\` for the first live export test; leave blank
+  later to request the whole available contiguous chapter index.
+- **FreeWebNovel - Bulk Download:** Up to ten FreeWebNovel book URLs, with an
+  optional common chapter range.
+
+Use book URLs such as:
+
+~~~text
+https://freewebnovel.com/novel/the-first-order
+~~~
+
+The workflows divide chapters into **50-chapter batches**, download each
+batch sequentially with a one-second interval between public chapter
+requests, and allow at most two simultaneous batches per book. Every
+chapter's text, position and checksum must be present before a finished
+EPUB is assembled. Failed or missing chapters stop the batch; the book
+is never registered as complete. Intermediate chapter-range artifacts
+can be reused when their retention has not expired. Output uses the
+same \`source.epub\`, numbered UTF-8 chapter text, JSON manifests and
+ZIP-artifact conventions as NovelFull. Successful metadata is published
+to the existing download registry without committing novel text.
+
+Only request books you have permission to archive. This adapter does not
+access locked pages or bypass access restrictions, and it does not
+automatically retry HTTP denials. Site changes or non-consecutive
+chapter numbering may stop a full-book download rather than produce a
+silently incomplete archive. In a **public** GitHub repository, Actions
+artifacts may be accessible to others; private books and permissions
+must be considered before uploading.
+
+For a small local test (from the repository root):
+
+~~~powershell
+python -m tools.freewebnovel_downloader "https://freewebnovel.com/novel/the-first-order" --chapter-range 1-2 --output-dir freewebnovel-test --confirm-rights
+~~~
+
+The standalone downloader supports batches of at most 100 chapters.
+The Actions workflow handles partitioning for longer novels.
+
 ## WebNovel compatibility feasibility (separate, metadata-only)
 
 WebNovel is **not yet supported as a chapter-download source**. Its public
