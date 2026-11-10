@@ -52,6 +52,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     outputs:
+      normalized_url: ${{ steps.source.outputs.url }}
       skip: ${{ steps.registry.outputs.skip }}
       matrix: ${{ steps.make_plan.outputs.matrix }}
       parallelism: ${{ steps.make_plan.outputs.parallelism }}
@@ -67,10 +68,31 @@ jobs:
           python-version: '3.12'
           cache: pip
 
+      - name: Validate and normalise FreeWebNovel book URL
+        id: source
+        env:
+          NOVEL_URL: ${{ inputs.novel_url }}
+        run: |
+          python - <<'PY'
+          import os
+          import re
+          from urllib.parse import urlsplit
+          raw = os.environ['NOVEL_URL']
+          parts = urlsplit(raw)
+          match = re.fullmatch(r'/novel/([a-z0-9]+(?:-[a-z0-9]+)*)/?', parts.path)
+          if (parts.scheme != 'https' or parts.hostname not in
+              ('freewebnovel.com', 'www.freewebnovel.com') or
+              parts.port is not None or parts.username or parts.password or
+              parts.query or parts.fragment or not match):
+              raise SystemExit('Use https://freewebnovel.com/novel/book-slug')
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as output:
+              output.write('url=https://freewebnovel.com/novel/' + match.group(1) + '\n')
+          PY
+
       - name: Check registry before doing any downloading
         id: registry
         env:
-          NOVEL_URL: ${{ inputs.novel_url }}
+          NOVEL_URL: ${{ steps.source.outputs.url }}
           CHAPTER_RANGE: ${{ inputs.chapter_range }}
           FORCE: ${{ inputs.force }}
         run: |
@@ -92,7 +114,7 @@ jobs:
         id: make_plan
         if: steps.registry.outputs.skip != 'true'
         env:
-          NOVEL_URL: ${{ inputs.novel_url }}
+          NOVEL_URL: ${{ steps.source.outputs.url }}
           CHAPTER_RANGE: ${{ inputs.chapter_range }}
         run: |
           python -u -m tools.freewebnovel_chunks plan \
@@ -128,7 +150,7 @@ jobs:
 
       - name: Recover previous complete batch or download range
         env:
-          NOVEL_URL: ${{ inputs.novel_url }}
+          NOVEL_URL: ${{ needs.prepare.outputs.normalized_url }}
           FORCE: ${{ inputs.force }}
           GH_TOKEN: ${{ github.token }}
           PYTHONUNBUFFERED: '1'
@@ -195,7 +217,7 @@ jobs:
 
       - name: Assemble and validate combined EPUB and TXT chapters
         env:
-          NOVEL_URL: ${{ inputs.novel_url }}
+          NOVEL_URL: ${{ needs.prepare.outputs.normalized_url }}
         run: |
           python -u -m tools.freewebnovel_chunks assemble \
             --url "$NOVEL_URL" \
@@ -215,7 +237,7 @@ jobs:
 
       - name: Regenerate registry from latest main and automatically merge PR
         env:
-          NOVEL_URL: ${{ inputs.novel_url }}
+          NOVEL_URL: ${{ needs.prepare.outputs.normalized_url }}
           CHAPTER_RANGE: ${{ inputs.chapter_range }}
           ARTIFACT_ID: ${{ steps.upload.outputs.artifact-id }}
           ARTIFACT_URL: ${{ steps.upload.outputs.artifact-url }}
