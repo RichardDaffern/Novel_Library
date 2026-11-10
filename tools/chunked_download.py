@@ -350,6 +350,12 @@ def assemble(plan: dict, chunks_dir: Path, output_dir: Path) -> Path:
          if isinstance(value, str) and value.strip()),
         "",
     )
+    if not description:
+        print(
+            "WARNING: No source synopsis is available in the downloaded "
+            "chapter batches; final EPUB cannot contain a description.",
+            flush=True,
+        )
     _epub(book, merged, title, author, language, url, description=description)
     epub_metadata, from_epub = epub_chapters(book / "source.epub")
     if len(from_epub) != len(merged):
