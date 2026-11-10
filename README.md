@@ -55,6 +55,20 @@ For automatic PR creation and merging, the repository owner must enable **Settin
 
 **Important:** Your repository is currently public. GitHub Actions artifacts may be accessible to other users of public repositories. Making a repository private limits exposure but does not grant permission to redistribute copyrighted content.
 
+## Website-specific bulk download actions
+
+The GitHub Actions menu also has two dedicated entries:
+
+- **NovelFull - Bulk Download**: Opens a bulk form already locked to NovelFull.
+- **FreeWebNovel - Bulk Download**: Opens a bulk form already locked to FreeWebNovel.
+
+These are lightweight wrappers around **Library - Bulk Download**, not new
+downloader implementations. They accept the same semicolon-separated saved
+novel names, optional novel URLs, chapter range, and Force flag, and reuse
+the same validated planning, duplicate skipping, ZIP assembly and registry
+publication paths. The existing **Library - Bulk Download** remains available
+for mixing the two websites. The individual single-novel actions are unchanged.
+
 ## GitHub Actions: Library - Bulk Download
 
 Use **Actions > Library - Bulk Download > Run workflow** for downloads from
@@ -141,6 +155,25 @@ python -m tools.freewebnovel_downloader "https://freewebnovel.com/novel/the-firs
 
 The standalone downloader supports batches of at most 100 chapters.
 The Actions workflow handles partitioning for longer novels.
+
+## Novel Fire and Light Novel Pub: isolated feasibility stage
+
+The next candidate websites are tracked in
+[docs/experimental-sources.md](docs/experimental-sources.md).
+An **offline-only** novel-page and two-chapter feasibility tool is available:
+
+~~~powershell
+python -m tools.source_feasibility "https://novelfire.net/book/martial-world" --book-html "book.html" --index-html "chapters.html"
+python -m tools.source_feasibility "https://novelfire.net/book/martial-world" --book-html "book.html" --index-html "chapters.html" --chapter-html "one.html" --chapter-html "two.html" --confirm-rights
+~~~
+
+It reads HTML that you have already saved through permitted means, never
+contacts either website, and reports chapter length/checksums without copying
+prose into its report. It cannot download whole novels. In particular,
+Novel Fire's published terms prohibit scraping, and current automated
+access/permissions for Light Novel Pub have not been established. For
+those reasons, neither experimental source is offered as a live download
+action yet. The existing NovelFull and FreeWebNovel pipelines are unaffected.
 
 ## WebNovel compatibility feasibility (separate, metadata-only)
 
