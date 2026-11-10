@@ -1,4 +1,4 @@
-name: Bulk Download Novels
+name: NovelFull Bulk Download
 
 on:
   workflow_dispatch:
