@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Repair missing synopsis metadata in existing novel ZIPs without re-downloading chapters.
 
-The original ZIP is never overwritten; repaired copies go to Synopsis_Repaired.
+Repairs are validated in a temporary ZIP, then atomically replace the original.
+The original is untouched if extraction, rewriting or validation fails.
 May use a provided synopsis or the ordinary public NovelFull book page.
 No login, proxies, CAPTCHAs, paywall bypass, or automatic retries.
 """
@@ -10,6 +11,7 @@ from __future__ import annotations
 import argparse
 from io import BytesIO
 import json
+import os
 from pathlib import Path
 import re
 import shutil
@@ -134,8 +136,55 @@ def archive_info(path: Path) -> tuple[str, str, dict, bytes, str]:
         return meta_path, epub_path, metadata, epub_bytes, read_epub_description(epub_bytes)[1]
 
 
-def repair(path: Path, output_dir: Path, *, provided="",
+def _verify_repair(original_path: Path, candidate_path: Path, meta_path: str,
+                   epub_path: str, expected_meta: dict, synopsis: str) -> None:
+    """Check that the replacement changes *only* synopsis metadata.
+
+    Read every archive member, not just its ZIP central directory. That
+    validates CRCs and ensures all chapter bytes and manifests are identical.
+    """
+    with ZipFile(original_path) as original, ZipFile(candidate_path) as candidate:
+        if original.namelist() != candidate.namelist():
+            raise SynopsisError("Repaired ZIP changed its contents list")
+        if original.testzip() is not None or candidate.testzip() is not None:
+            raise SynopsisError("Original or repaired ZIP failed CRC verification")
+        saved_meta = json.loads(candidate.read(meta_path))
+        if saved_meta != expected_meta:
+            raise SynopsisError("Repaired metadata differs beyond the synopsis fields")
+        with ZipFile(BytesIO(original.read(epub_path))) as old_epub, \
+                ZipFile(BytesIO(candidate.read(epub_path))) as new_epub:
+            if old_epub.namelist() != new_epub.namelist():
+                raise SynopsisError("Repair changed EPUB's file list")
+            opf_path = read_epub_description(new_epub.fp.getvalue() if isinstance(
+                new_epub.fp, BytesIO) else candidate.read(epub_path))[0]
+            if read_epub_description(candidate.read(epub_path))[1] != synopsis:
+                raise SynopsisError("Repaired EPUB synopsis verification failed")
+            for name in old_epub.namelist():
+                if name != opf_path and old_epub.read(name) != new_epub.read(name):
+                    raise SynopsisError(f"Repair altered EPUB member {name}")
+        for name in original.namelist():
+            if name not in (meta_path, epub_path):
+                # Compare in bounded chunks to avoid loading hundreds of chapters
+                # into memory when repairing large novels.
+                with original.open(name) as before, candidate.open(name) as after:
+                    while True:
+                        old_chunk = before.read(1024 * 1024)
+                        new_chunk = after.read(1024 * 1024)
+                        if old_chunk != new_chunk:
+                            raise SynopsisError(f"Repair altered archive member {name}")
+                        if not old_chunk:
+                            break
+
+
+def repair(path: Path, output_dir: Path | None = None, *, provided="",
            fetcher=public_novelfull_synopsis) -> str:
+    """Validate a temporary ZIP and atomically replace the original by default.
+
+    Supplying an explicit output_dir retains the previous copy-mode behaviour,
+    but the default --apply operation never creates a duplicate output folder.
+    """
+    path = Path(path)
+    original_stat = path.stat()
     meta_path, epub_path, metadata, epub_bytes, old_epub = archive_info(path)
     existing = metadata.get("description") or metadata.get("synopsis") or old_epub
     if existing and not provided:
@@ -145,18 +194,20 @@ def repair(path: Path, output_dir: Path, *, provided="",
             return "synopsis already complete"
     else:
         synopsis = clean_description(provided or fetcher(metadata["source_url"]))
+
     new_meta = dict(metadata)
     new_meta["description"] = synopsis
     new_meta["synopsis"] = synopsis
     new_epub = patch_epub(epub_bytes, synopsis)
-    output_dir.mkdir(parents=True, exist_ok=True)
-    output = output_dir / path.name
-    if output.resolve() == path.resolve():
-        raise SynopsisError("Output must not overwrite the original ZIP")
-    if output.exists():
+
+    output = (Path(output_dir) / path.name) if output_dir is not None else path
+    replacing_original = output.resolve() == path.resolve()
+    if not replacing_original and output.exists():
         return "repaired output already exists"
+    output.parent.mkdir(parents=True, exist_ok=True)
+    # Same-directory staging is required for an atomic rename on Windows/NTFS.
     with tempfile.NamedTemporaryFile(prefix=".synopsis-", suffix=".zip",
-                                     dir=output_dir, delete=False) as tmp:
+                                     dir=output.parent, delete=False) as tmp:
         working = Path(tmp.name)
     try:
         with ZipFile(path) as source, ZipFile(working, "w") as destination:
@@ -169,20 +220,25 @@ def repair(path: Path, output_dir: Path, *, provided="",
                 else:
                     with source.open(entry) as original, destination.open(entry, "w") as copied:
                         shutil.copyfileobj(original, copied, length=1024 * 1024)
-        with ZipFile(working) as check, ZipFile(path) as original:
-            if check.testzip() is not None:
-                raise SynopsisError("Repaired ZIP failed CRC verification")
-            if check.namelist() != original.namelist():
-                raise SynopsisError("Repaired ZIP changed its contents list")
-            saved_meta = json.loads(check.read(meta_path))
-            if saved_meta["description"] != synopsis:
-                raise SynopsisError("Repaired JSON synopsis verification failed")
-            if read_epub_description(check.read(epub_path))[1] != synopsis:
-                raise SynopsisError("Repaired EPUB synopsis verification failed")
-        working.replace(output)
+
+        _verify_repair(path, working, meta_path, epub_path, new_meta, synopsis)
+
+        # Flush the fully validated replacement to disk before the swap.
+        with working.open("r+b") as file:
+            file.flush()
+            os.fsync(file.fileno())
+        if replacing_original:
+            current_stat = path.stat()
+            if (current_stat.st_size, current_stat.st_mtime_ns) != (
+                    original_stat.st_size, original_stat.st_mtime_ns):
+                raise SynopsisError(
+                    "Original ZIP changed during repair; not replacing it"
+                )
+            shutil.copymode(path, working)
+        working.replace(output)  # atomic on the same filesystem
     finally:
         working.unlink(missing_ok=True)
-    return f"saved {output}"
+    return f"replaced original {output}" if replacing_original else f"saved {output}"
 
 
 def main(argv=None) -> int:
@@ -190,10 +246,10 @@ def main(argv=None) -> int:
     source = parser.add_mutually_exclusive_group(required=True)
     source.add_argument("--zip", type=Path, help="One existing novel ZIP")
     source.add_argument("--directory", type=Path, help="Folder of existing novel ZIPs")
-    parser.add_argument("--output-dir", type=Path, help="Default: sibling Synopsis_Repaired folder")
+    parser.add_argument("--output-dir", type=Path, help="Optional copy-only folder; by default replace each original ZIP in place")
     parser.add_argument("--description", help="Custom synopsis for one ZIP, without network")
     parser.add_argument("--description-file", type=Path, help="UTF-8 text synopsis for one ZIP")
-    parser.add_argument("--apply", action="store_true", help="Write repaired ZIPs (dry-run by default)")
+    parser.add_argument("--apply", action="store_true", help="Atomically replace original ZIPs after validation (dry-run by default)")
     args = parser.parse_args(argv)
     if args.description and args.description_file:
         parser.error("Use --description or --description-file, not both")
@@ -204,7 +260,7 @@ def main(argv=None) -> int:
     inputs = [args.zip] if args.zip else sorted(args.directory.glob("*.zip"))
     if not inputs:
         parser.error("No novel ZIPs found")
-    output_dir = args.output_dir or (inputs[0].parent / "Synopsis_Repaired")
+    output_dir = args.output_dir
     errors = 0
     for index, path in enumerate(inputs):
         try:
