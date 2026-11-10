@@ -106,11 +106,29 @@ def _text(value: str) -> str:
     return str(value or "").replace("|", r"\|").replace("\n", " ").strip()
 
 
+SITE_LABELS = {
+    "novelfull.com": "NovelFull",
+    "freewebnovel.com": "FreeWebNovel",
+}
+
+
+def website_name(url: str) -> str:
+    """Human-readable source, inferred for old records without schema migration."""
+    host = (urlsplit(canonical_url(url)).hostname or "").lower()
+    host = host.removeprefix("www.")
+    return SITE_LABELS.get(host, host)
+
+
 def write_registry(registry: dict, json_path: Path, md_path: Path) -> None:
+    # Preserve the established version-1 JSON structure and every historical
+    # record/artifact link. Website grouping is a presentation concern only.
     registry["novels"].sort(key=lambda n: n["url"])
     json_path.parent.mkdir(parents=True, exist_ok=True)
     json_path.write_text(json.dumps(registry, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     now = datetime.now(timezone.utc)
+    groups: dict[str, list[dict]] = {}
+    for novel in registry["novels"]:
+        groups.setdefault(website_name(novel["url"]), []).append(novel)
     lines = [
         "# Downloaded novels",
         "",
@@ -118,22 +136,31 @@ def write_registry(registry: dict, json_path: Path, md_path: Path) -> None:
         "Actual text/EPUB files are in temporary GitHub Actions artifacts, **not the Git repository**.",
         "Expired artifacts cannot be retrieved; such entries remain as history but will not block a new download.",
         "",
-        "| Novel | Range | Chapters | Artifact | Expiry (UTC) |",
-        "|---|---|---:|---|---|",
     ]
-    for novel in registry["novels"]:
-        for item in sorted(novel.get("downloads", []), key=lambda v: v.get("completed_at_utc", "")):
-            link = item.get("artifact_url") or item.get("run_url") or ""
-            status = "Available" if (expiry(item) or now) > now and expiry(item) else "Expired"
-            artifact = f"[{status}]({link})" if link else status
-            lines.append(
-                f"| [{_text(novel.get('title') or novel['url'])}]({novel['url']}) | "
-                f"{_text(item.get('range'))} | "
-                f"{item.get('chapter_count', 0)} | {artifact} | {_text(item.get('expires_at_utc'))} |"
-            )
-    if not registry["novels"]:
-        lines.append("| No completed downloads | | | | |")
-    md_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    if not groups:
+        lines.append("No completed downloads yet.")
+    for website in sorted(groups, key=str.casefold):
+        novels = sorted(
+            groups[website], key=lambda n: ((n.get("title") or n["url"]).casefold(), n["url"])
+        )
+        lines.extend([
+            f"## {website} ({len(novels)} novels)",
+            "",
+            "| Novel | Range | Chapters | Artifact | Expiry (UTC) |",
+            "|---|---|---:|---|---|",
+        ])
+        for novel in novels:
+            for item in sorted(novel.get("downloads", []), key=lambda v: v.get("completed_at_utc", "")):
+                link = item.get("artifact_url") or item.get("run_url") or ""
+                status = "Available" if (expiry(item) or now) > now and expiry(item) else "Expired"
+                artifact = f"[{status}]({link})" if link else status
+                lines.append(
+                    f"| [{_text(novel.get('title') or novel['url'])}]({novel['url']}) | "
+                    f"{_text(item.get('range'))} | "
+                    f"{item.get('chapter_count', 0)} | {artifact} | {_text(item.get('expires_at_utc'))} |"
+                )
+        lines.append("")
+    md_path.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
 
 
 def record_download(registry: dict, url: str, chapter_range: str, downloads_dir: Path,
