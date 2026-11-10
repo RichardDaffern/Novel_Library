@@ -87,6 +87,8 @@ def download_covers(records: list[dict], out: Path, *, dry_run=False,
         folder = out / item["website"]
         stem = cover_basename(item)
         result = dict(item)
+        result["novel_id"] = sha256(item["url"].encode("utf-8")).hexdigest()[:8]
+        result["source_url"] = item["url"]
         result["status"] = ""
         if dry_run:
             result["status"] = "planned"
@@ -101,7 +103,10 @@ def download_covers(records: list[dict], out: Path, *, dry_run=False,
                     _, extension = validate_image(path.read_bytes())
                     if path.suffix.lower() != extension:
                         raise CoverError("Existing cover extension does not match content")
-                result.update(status="skipped", path=str(existing[0]))
+                result.update(
+                    status="skipped", path=str(existing[0]),
+                    cover_file=f"{item['website']}/{existing[0].name}",
+                )
                 print(f"[skip] {item['title']}")
             except (CoverError, OSError) as exc:
                 result.update(status="failed", error=f"Existing image requires --force: {exc}")
@@ -136,8 +141,11 @@ def download_covers(records: list[dict], out: Path, *, dry_run=False,
                         old.unlink(missing_ok=True)
             finally:
                 staged.unlink(missing_ok=True)
-            result.update(status="downloaded", path=str(destination),
-                          cover_source_url=cover_url)
+            result.update(
+                status="downloaded", path=str(destination),
+                cover_file=f"{item['website']}/{destination.name}",
+                cover_source_url=cover_url,
+            )
             print(f"[saved] {item['website']}: {item['title']} -> {destination}")
         except (CoverError, OSError, ValueError) as exc:
             result.update(status="failed", error=str(exc))
