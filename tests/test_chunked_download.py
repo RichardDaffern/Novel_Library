@@ -278,7 +278,7 @@ class ChapterBatchTests(unittest.TestCase):
 
     def test_legacy_novelfull_cache_rejected_without_disabling_other_sites(self):
         from tools.chunked_download import cache_has_synopsis_support
-        modern = {"synopsis_pipeline_version": 2, "chapter_count": 2}
+        modern = {"synopsis_pipeline_version": 2, "cover_pipeline_version": 1, "chapter_count": 2}
         old = {"chapter_count": 2}
         novel = "https://novelfull.com/fictional-title.html"
         self.assertFalse(cache_has_synopsis_support(old, novel))
@@ -286,8 +286,11 @@ class ChapterBatchTests(unittest.TestCase):
         self.assertFalse(cache_has_synopsis_support(
             {"synopsis_pipeline_version": 1}, novel
         ))
-        self.assertTrue(cache_has_synopsis_support(
+        self.assertFalse(cache_has_synopsis_support(
             old, "https://freewebnovel.com/novel/the-first-order"
+        ))
+        self.assertTrue(cache_has_synopsis_support(
+            modern, "https://freewebnovel.com/novel/the-first-order"
         ))
 
     def test_legacy_cache_candidate_is_ignored_before_copying_into_download(self):
@@ -328,6 +331,7 @@ class ChapterBatchTests(unittest.TestCase):
             meta_file = cache / "book" / "metadata.json"
             data = json.loads(meta_file.read_text(encoding="utf-8"))
             data["synopsis_pipeline_version"] = 2
+            data["cover_pipeline_version"] = 1
             meta_file.write_text(json.dumps(data), encoding="utf-8")
             destination = root / "restored"
             def fake_gh(args, **kwargs):
