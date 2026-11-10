@@ -1,0 +1,27 @@
+name: Temporary merged branch cleanup
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/cleanup-one-bulk-branch-once.yml
+permissions:
+  contents: write
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Remove only the verified merged feature ref
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          expected='9e7f191b1655ff755df5947ba096a5db1c58f677'
+          name='fix/one-bulk-and-wtr-royalroad-feasibility'
+          actual=$(gh api "repos/${REPOSITORY}/git/ref/heads/${name}" --jq '.object.sha')
+          if [[ "$actual" != "$expected" ]]; then
+            echo "::error::Branch moved since audit; preserving it"
+            exit 1
+          fi
+          gh api -X DELETE "repos/${REPOSITORY}/git/refs/heads/${name}"
+          echo "Deleted safely: ${name}"
