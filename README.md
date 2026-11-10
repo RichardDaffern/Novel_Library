@@ -172,6 +172,63 @@ eligible chapters. In-app caching is different from an authorised EPUB/TXT
 export. A standalone chapter-export adapter would require an approved
 source/permission and a separate implementation and validation process.
 
+## Novel covers and image-only downloads
+
+**New future downloads:** The NovelFull downloader extracts the original
+EPUB's cover image (when present). FreeWebNovel obtains its cover from the
+public novel information page where available. Covers are validated before
+use and remain optional. Chapter ZIP archives include a standalone `cover.jpg`
+or `cover.png`, a `cover_image` filename in `metadata.json`, and an EPUB
+with a proper cover image and cover-page metadata. The chapter TXT files,
+chapter hashes and existing ZIP identity remain unchanged. Coverless sources
+continue to work.
+
+**Existing completed novels, images only:** In **GitHub Actions**, select
+**Covers - Download**, choose All, NovelFull or FreeWebNovel, choose the
+optional limit (0 = all), and confirm you have permission to save the images.
+The Action reads [DOWNLOADED_NOVELS.md](DOWNLOADED_NOVELS.md) and downloads
+**only cover images**. It does not retrieve or change chapters, EPUBs,
+existing ZIPs or the registry. The resulting **novel-cover-images**
+downloadable Actions artifact (30-day retention) contains:
+
+~~~text
+NovelFull/martial-world-<8-character-ID>.jpg
+NovelFull/true-martial-world-<8-character-ID>.png
+FreeWebNovel/the-first-order-<8-character-ID>.jpg
+covers_manifest.json
+~~~
+
+The ID is the first eight hexadecimal characters of the SHA-256 hash of
+the source book URL, making filenames repeatable across runs and distinct
+even when books have identical names. The manifest records title, source URL,
+website, novel ID, relative cover filename and success/skip/failure state.
+Multiple ranges of the same title are deduplicated.
+
+To download images to your Windows laptop instead, run these commands from
+the repository root:
+
+~~~powershell
+git pull
+python -m pip install -r requirements.txt
+python -m tools.download_covers --dry-run
+python -m tools.download_covers --confirm-rights
+~~~
+
+The third command previews all selected titles and performs no network
+requests. The final command saves images to `Downloaded_Covers` and writes
+a JSON manifest; existing, valid images are skipped. Use
+`--website NovelFull`, `--website FreeWebNovel` or `--limit 5` to select a
+subset, and `--force` to replace an existing cover after validation.
+
+The standalone image-only script **does not retrofit the covers into old
+novel ZIPs**: that would be a separate archive-repair operation. Only
+cover images from publicly readable book information pages are attempted;
+blocked, unavailable, missing or invalid images are reported rather than
+fabricated or substituted. Images can be copyrighted; save only images you
+are authorised to archive. In a public GitHub repository, Actions artifacts
+may be visible to other users. Embedding the image in a ZIP does not by
+itself enable cover display in Taiyou's Personal Library frontend.
+
 ## Synopsis metadata in EPUB and ZIP archives
 
 NovelFull's FanFicFare adapter reads each book's public description and can
