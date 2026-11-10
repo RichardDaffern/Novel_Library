@@ -30,7 +30,7 @@ Chapter ranges are one-based, inclusive positions in the site's chapter index. T
 
 ## GitHub Actions: NovelFull - Download
 
-Both download workflows use FanFicFare and are currently used for NovelFull URLs; other FanFicFare-supported sources may also work. The separate `CI` workflow runs automatic regression checks and is not a downloadable-novel action.
+The NovelFull single-download workflow uses FanFicFare. The separate `CI` workflow runs automatic regression checks and is not a downloadable-novel action.
 
 In **Actions > NovelFull - Download > Run workflow**, enter:
 
@@ -55,17 +55,48 @@ For automatic PR creation and merging, the repository owner must enable **Settin
 
 **Important:** Your repository is currently public. GitHub Actions artifacts may be accessible to other users of public repositories. Making a repository private limits exposure but does not grant permission to redistribute copyrighted content.
 
-## GitHub Actions: NovelFull - Bulk Download
+## GitHub Actions: Library - Bulk Download
 
-Use **Actions > NovelFull - Bulk Download > Run workflow** and enter up to 10 distinct authorised novel URLs separated by commas, spaces or newlines. You may specify one inclusive chapter range for all novels and use Force to bypass the existing-archive check.
+Use **Actions > Library - Bulk Download > Run workflow** for downloads from
+both supported websites. The workflow groups download jobs by website,
+without changing the individual site-specific downloaders.
 
-The bulk workflow checks the downloaded-novels registry once, removes duplicate URLs and **calls the same automatic chunked downloader for each outstanding novel**. Up to **three distinct novels run concurrently**. Each novel independently scales from **one to six chapter jobs** based on its selected chapter count. This can mean up to **18 chapter download jobs** within one bulk run, subject to GitHub runner availability and source-site limits. Previously recorded completed novels are still skipped when their artifacts are available. A failed novel does not prevent later novels from running.
+- **Website group:** All, NovelFull or FreeWebNovel.
+- **Saved novel names:** Type names listed in
+  [DOWNLOADED_NOVELS.md](DOWNLOADED_NOVELS.md), separated by commas or
+  semicolons. Example: `The World Online; The First Order`. Use semicolons
+  when a novel's title itself contains a comma.
+- **New novel URLs:** Optionally supply HTTPS source URLs for books not yet
+  recorded. Names and URLs can be mixed.
+- **Chapter range:** Optional; blank requests a whole novel.
+- **Force:** Redownload even if a completed artifact is still available.
 
-**Each completed novel has its own EPUB/TXT ZIP artifact within the bulk workflow run**, rather than a combined batch ZIP. Each novel updates the Markdown/JSON index through its own conflict-safe metadata-only pull request. Concurrent unrelated single-novel workflows are also permitted. All artifacts are retained for seven days. Individual verified chapter-range artifacts can be reused on retry, unless Force is selected.
+GitHub Actions lacks a dynamic multi-select field, so saved names are entered
+as multi-value text rather than selected with checkboxes. Example: select
+NovelFull and enter `True Martial World; The World Online`. The planner
+resolves their saved URLs automatically. To list recognised titles, run:
 
-The overall bulk workflow reports failure if any novel fails; completed novels and their downloadable artifacts remain available. The workflows do not publish novel text or EPUBs in Git, and only authorised downloads should be submitted.
+~~~powershell
+python -m tools.library_bulk list
+~~~
 
+Titles come from the completed-download registry and
+[novel_sources.json](novel_sources.json), a small curated list seeded with
+the tested FreeWebNovel example. For a brand-new title, enter its exact URL;
+after a successful download and registry update, that title is available by
+name. You can also add a title/URL to the curated JSON list beforehand.
 
+Unknown or ambiguous titles, URLs from an unsupported or mismatched site,
+and more than **10 distinct novels** are rejected before any downloading.
+Already-available books are skipped unless Force is selected. Up to three
+NovelFull books and two FreeWebNovel books can run concurrently; the source
+downloaders still enforce their own chapter limits. Each book produces its
+own ZIP artifact, with metadata-only registry updates for completed books.
+
+`DOWNLOADED_NOVELS.md` is grouped by website automatically. Historical
+downloads retain all their artifact links and chapter counts, including
+expired artifacts. Only archive content you are authorised to store. In a
+public repository, GitHub Actions artifacts may be accessible to others.
 
 ## GitHub Actions: FreeWebNovel
 
@@ -75,13 +106,7 @@ verified locally against the novel **The First Order** on 10 November 2026.
 A completed whole-book FreeWebNovel download remains unverified until the
 dedicated Actions workflows are run against the live site.
 
-Two additional actions are available:
-
-- **FreeWebNovel - Download:** One public FreeWebNovel novel URL. Set
-  **Chapter range** to \`1-2\` for the first live export test; leave blank
-  later to request the whole available contiguous chapter index.
-- **FreeWebNovel - Bulk Download:** Up to ten FreeWebNovel book URLs, with an
-  optional common chapter range.
+**FreeWebNovel - Download** handles one book. Use **Library - Bulk Download** for multiple titles across either website, optionally by saved novel names.
 
 Use book URLs such as:
 
