@@ -145,7 +145,8 @@ class CoverPipelineTests(unittest.TestCase):
             self.assertEqual(
                 (root / "export" / "cover.png").read_bytes(), image_bytes("PNG")
             )
-            self.assertEqual(len(epub_chapters(root / "export" / "source.epub")[1]), 1)
+            # export_epub exports chapters/metadata; the original EPUB stays at its source.
+            self.assertEqual(len(epub_chapters(original / "source.epub")[1]), 1)
 
     def test_final_assembly_preserves_cover_after_two_ranges(self):
         plan = chapter_plan(NOVELFULL, 4, "1-4", chunk_size=2)
