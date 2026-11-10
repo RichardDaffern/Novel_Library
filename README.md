@@ -144,6 +144,29 @@ python -m tools.freewebnovel_downloader "https://freewebnovel.com/novel/the-firs
 The standalone downloader supports batches of at most 100 chapters.
 The Actions workflow handles partitioning for longer novels.
 
+## WTR-Lab and Royal Road: offline integration
+
+New source investigations are documented in
+[experimental-sources.md](docs/experimental-sources.md), including WTR-Lab's
+current URL formats, Royal Road's chapter-ID ordering, published access
+restrictions and the limits of automated downloading.
+
+For **EPUB files you are already authorised to keep**, you can import them
+into a complete, verified novel ZIP without contacting either website:
+
+~~~powershell
+python -m tools.import_local_epub --epub "Author Export.epub" --source-url "https://royalroad.com/fiction/21220/mother-of-learning" --confirm-rights
+~~~
+
+The output is `Imported_Novels/novel-<stable-URL-hash>.zip`, with original
+EPUB, chapter TXT files, JSON manifests, and any EPUB synopsis/cover. It is
+validated before publication; an existing ZIP will not be replaced unless
+`--replace` is explicitly requested. This is **not a website downloader**:
+it requires the user to supply an authorised EPUB. WTR-Lab's published terms
+restrict automated requests and downloading, and Royal Road's existing
+FanFicFare adapter does not grant blanket permission to archive other
+authors' works. Neither source has been enabled in live GitHub Actions.
+
 ## Novel Fire and Light Novel Pub: isolated feasibility stage
 
 The next candidate websites are tracked in
