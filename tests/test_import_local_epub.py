@@ -79,6 +79,20 @@ class LocalEpubArchiveTests(unittest.TestCase):
                 self.assertIn("synopsis", meta)
                 self.assertEqual(len(members), 6)
 
+    def test_windows_style_line_endings_are_reconciled_only_when_hash_matches(self):
+        from tools.import_local_epub import LocalImportError
+        import hashlib
+        source = b"First line\nSecond line\n"
+        windows = source.replace(b"\n", b"\r\n")
+        self.assertNotEqual(
+            hashlib.sha256(source).hexdigest(),
+            hashlib.sha256(windows).hexdigest()
+        )
+        self.assertEqual(
+            hashlib.sha256(windows.replace(b"\r\n", b"\n")).hexdigest(),
+            hashlib.sha256(source).hexdigest()
+        )
+
     def test_wtrlab_authorised_source_without_cover_still_valid(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
