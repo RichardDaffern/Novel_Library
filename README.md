@@ -172,6 +172,56 @@ eligible chapters. In-app caching is different from an authorised EPUB/TXT
 export. A standalone chapter-export adapter would require an approved
 source/permission and a separate implementation and validation process.
 
+## Synopsis metadata in EPUB and ZIP archives
+
+NovelFull's FanFicFare adapter reads each book's public description and can
+store it in the source EPUB as `dc:description`. The download pipeline now
+preserves this information through chapter-range exports and the final
+reassembled EPUB. Both `source.epub` and `metadata.json` include the
+description; the JSON also offers a `synopsis` alias for library readers.
+Books whose source does not supply a description are left blank rather than
+given fabricated text. The preservation fix applies to **newly created**
+download artifacts; it does not rewrite existing GitHub artifacts.
+
+To repair downloaded ZIPs **without downloading any chapters again**, use
+the separate `tools/repair_synopsis.py` command. It checks whether the
+existing ZIP's EPUB or metadata already contains a synopsis. Otherwise, it
+can fetch the description from the public NovelFull **book information**
+page only (no chapter requests, login, challenge bypass or retries).
+It adds `dc:description` to the embedded EPUB and `description` plus
+`synopsis` to the JSON. Chapter TXT files and manifests are unchanged.
+
+First check a single ZIP:
+
+~~~powershell
+python -m tools.repair_synopsis --zip "Downloaded_Novels/novel-123.zip"
+~~~
+
+Repair one ZIP using its public NovelFull book synopsis:
+
+~~~powershell
+python -m tools.repair_synopsis --zip "Downloaded_Novels/novel-123.zip" --apply
+~~~
+
+Or repair every valid novel ZIP in your downloaded directory:
+
+~~~powershell
+python -m tools.repair_synopsis --directory "Downloaded_Novels"
+python -m tools.repair_synopsis --directory "Downloaded_Novels" --apply
+~~~
+
+The default is a **dry run**. `--apply` writes corrected copies into
+`Downloaded_Novels/Synopsis_Repaired/`. It does **not** overwrite source
+ZIPs or redownload chapter text. If you already have a custom synopsis or
+the public source is unavailable, pass `--description-file "summary.txt"`
+with a single `--zip` and `--apply`. The importer in your reading app
+may require you to replace or reimport the previously imported novel:
+repairing your local ZIP does not retroactively change hosted/library data.
+
+Only archive and update material you are authorised to keep. Source
+descriptions may be unavailable or blocked; failed books are reported and
+their original ZIPs remain untouched.
+
 ## Windows: one-click download of completed archives
 
 The [Download-All-Novels.cmd](Download-All-Novels.cmd) launcher retrieves the already-created, **full-novel** GitHub Actions artifacts listed in [downloaded_novels.json](downloaded_novels.json). It does **not** download chapters from source websites or trigger new Actions runs.
