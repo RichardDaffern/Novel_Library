@@ -131,7 +131,7 @@ def _validate_saved_row(book: Path, row: dict, number: int) -> bool:
     return (
         chapter_file.is_file()
         and chapter_file.stat().st_size >= MIN_BODY_CHARS
-        and sha256(chapter_file.read_bytes()).hexdigest() == row.get("sha256")
+        and sha256(chapter_file.read_text(encoding="utf-8").encode("utf-8")).hexdigest() == row.get("sha256")
     )
 
 
