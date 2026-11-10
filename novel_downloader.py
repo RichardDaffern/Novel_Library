@@ -85,7 +85,7 @@ def epub_chapters(epub_path: Path) -> tuple[dict, list[dict]]:
         if raw_description:
             # Decode real HTML snippets, but do not treat literal angle-bracket
             # text (for example "<unknown>") as an HTML tag and discard it.
-            if re.search(r"</?(?:p|div|br|span|blockquote|ul|li|b|i|em|strong|a)\\b",
+            if re.search(r"</?(?:p|div|br|span|blockquote|ul|li|b|i|em|strong|a)\b",
                          raw_description, flags=re.IGNORECASE):
                 description = BeautifulSoup(raw_description, "html.parser").get_text("\n", strip=True).strip()
             else:
