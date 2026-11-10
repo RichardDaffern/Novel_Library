@@ -94,11 +94,15 @@ def import_epub_to_zip(epub: Path, output_dir: Path, source_url: str, *,
                                          dir=output_dir, delete=False) as file:
             staged = Path(file.name)
         try:
+            rows_in_manifest = json.loads(
+                (book / "chapters.json").read_text(encoding="utf-8")
+            )
+            expected_hashes = {
+                row["file"]: row["sha256"] for row in rows_in_manifest
+            }
             expected = [
                 "metadata.json", "chapters.json", "source.epub",
-                *[row["file"] for row in json.loads(
-                    (book / "chapters.json").read_text(encoding="utf-8")
-                )],
+                *[row["file"] for row in rows_in_manifest],
             ]
             if saved.get("cover_image"):
                 expected.append(saved["cover_image"])
@@ -109,7 +113,22 @@ def import_epub_to_zip(epub: Path, output_dir: Path, source_url: str, *,
                     candidate = book / relative
                     if not candidate.is_file() or candidate.parent != book:
                         raise LocalImportError(f"Missing or unsafe book member: {relative}")
-                    archive.write(candidate, arcname=f"{book_slug}/{relative}")
+                    if relative in expected_hashes:
+                        # On Windows, Path.write_text with default newline
+                        # converts LF to CRLF, although export_epub hashes LF.
+                        # Normalise only when that roundtrip is verified.
+                        data = candidate.read_bytes()
+                        expected_digest = expected_hashes[relative]
+                        if hashlib.sha256(data).hexdigest() != expected_digest:
+                            normalized = data.replace(b"\r\n", b"\n")
+                            if hashlib.sha256(normalized).hexdigest() != expected_digest:
+                                raise LocalImportError(
+                                    f"Exported chapter failed SHA-256: {relative}"
+                                )
+                            data = normalized
+                        archive.writestr(f"{book_slug}/{relative}", data)
+                    else:
+                        archive.write(candidate, arcname=f"{book_slug}/{relative}")
             with ZipFile(staged) as check:
                 if check.testzip() is not None:
                     raise LocalImportError("Final novel ZIP failed CRC verification")
