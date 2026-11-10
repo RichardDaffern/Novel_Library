@@ -69,7 +69,7 @@ class LibraryBulkTests(unittest.TestCase):
     def test_name_selection_and_grouped_matrices(self):
         plan = selection_plan(
             sample_registry(), CURATED, "The World Online; The First Order",
-            "", "All", "1-2",
+            "", "All", "1-2", force=True,
         )
         self.assertEqual(plan["selected_count"], 2)
         self.assertEqual([n["novel_url"] for n in plan["groups"]["NovelFull"]], [NOVELFULL])
@@ -152,7 +152,7 @@ class LibraryBulkTests(unittest.TestCase):
                 self.assertEqual(main([
                     "plan", "--registry", str(reg), "--catalogue", str(cat),
                     "--names", "The World Online; The First Order",
-                    "--chapter-range", "1-2", "--plan-file", str(root / "plan.json"),
+                    "--chapter-range", "1-2", "--force", "--plan-file", str(root / "plan.json"),
                 ]), 0)
             pairs = dict(line.split("=", 1) for line in out.read_text().splitlines())
             self.assertEqual(pairs["has_novelfull"], "true")
