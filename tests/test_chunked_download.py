@@ -276,6 +276,73 @@ class ChapterBatchTests(unittest.TestCase):
             self.assertEqual(calls[0][:3], ["gh", "run", "download"])
             self.assertEqual(len(validate_piece(destination, URL, identity(URL), 1, 2)["chapters"]), 2)
 
+    def test_legacy_novelfull_cache_rejected_without_disabling_other_sites(self):
+        from tools.chunked_download import cache_has_synopsis_support
+        modern = {"synopsis_pipeline_version": 2, "chapter_count": 2}
+        old = {"chapter_count": 2}
+        novel = "https://novelfull.com/fictional-title.html"
+        self.assertFalse(cache_has_synopsis_support(old, novel))
+        self.assertTrue(cache_has_synopsis_support(modern, novel))
+        self.assertFalse(cache_has_synopsis_support(
+            {"synopsis_pipeline_version": 1}, novel
+        ))
+        self.assertTrue(cache_has_synopsis_support(
+            old, "https://freewebnovel.com/novel/the-first-order"
+        ))
+
+    def test_legacy_cache_candidate_is_ignored_before_copying_into_download(self):
+        import shutil
+        from types import SimpleNamespace
+        from unittest.mock import patch
+        from tools.chunked_download import reuse_complete_piece
+
+        novel = "https://novelfull.com/fictional-title.html"
+        key = identity(novel)
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            old_cache = make_piece(root / "old", novel, key, 1, 2)
+            destination = root / "new"
+            artifact = {"workflow_run": {"id": 321}}
+            def fake_gh(args, **kwargs):
+                output = Path(args[args.index("-D") + 1])
+                shutil.copytree(old_cache, output, dirs_exist_ok=True)
+                return SimpleNamespace(returncode=0)
+            with patch("tools.chunked_download._prior_artifacts", return_value=[artifact]):
+                with patch("tools.chunked_download.subprocess.run", side_effect=fake_gh):
+                    self.assertFalse(reuse_complete_piece(
+                        destination, novel, key, 1, 2
+                    ))
+            self.assertFalse(destination.exists())
+
+    def test_modern_novelfull_cache_can_still_be_reused(self):
+        import shutil
+        from types import SimpleNamespace
+        from unittest.mock import patch
+        from tools.chunked_download import reuse_complete_piece
+
+        novel = "https://novelfull.com/fictional-title.html"
+        key = identity(novel)
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            cache = make_piece(root / "cached", novel, key, 1, 2)
+            meta_file = cache / "book" / "metadata.json"
+            data = json.loads(meta_file.read_text(encoding="utf-8"))
+            data["synopsis_pipeline_version"] = 2
+            meta_file.write_text(json.dumps(data), encoding="utf-8")
+            destination = root / "restored"
+            def fake_gh(args, **kwargs):
+                output = Path(args[args.index("-D") + 1])
+                shutil.copytree(cache, output, dirs_exist_ok=True)
+                return SimpleNamespace(returncode=0)
+            with patch("tools.chunked_download._prior_artifacts", return_value=[{
+                "workflow_run": {"id": 321}
+            }]):
+                with patch("tools.chunked_download.subprocess.run", side_effect=fake_gh):
+                    self.assertTrue(reuse_complete_piece(
+                        destination, novel, key, 1, 2
+                    ))
+            self.assertTrue(destination.exists())
+
     def test_synthetic_url_identity_is_stable(self):
         plan = chapter_plan(SYNTHETIC_URL, 9, "3-4")
         self.assertEqual(plan["pieces"][0]["name"],
