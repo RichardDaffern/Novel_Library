@@ -4,13 +4,15 @@ This is an index of **completed** downloads, not a copy of the novels.
 Actual text/EPUB files are in temporary GitHub Actions artifacts, **not the Git repository**.
 Expired artifacts cannot be retrieved; such entries remain as history but will not block a new download.
 
+## NovelFull (89 novels)
+
 | Novel | Range | Chapters | Artifact | Expiry (UTC) |
 |---|---|---:|---|---|
 | [Abe the Wizard](https://novelfull.com/abe-the-wizard.html) | all | 1512 | [Available](https://github.com/RichardDaffern/Novel_Library/actions/runs/42393126629/artifacts/13592251409) | 2026-11-14T21:53:01Z |
 | [Chaotic Sword God](https://novelfull.com/chaotic-sword-god.html) | all | 4035 | [Available](https://github.com/RichardDaffern/Novel_Library/actions/runs/42466652147/artifacts/13619781585) | 2026-11-15T13:43:07Z |
 | [Crazy Detective](https://novelfull.com/crazy-detective.html) | all | 2686 | [Available](https://github.com/RichardDaffern/Novel_Library/actions/runs/42513475192/artifacts/13636899276) | 2026-11-15T22:35:59Z |
-| [Cultivation! My Augmented Statuses Have Unlimited Duration](https://novelfull.com/cultivation-my-augmented-statuses-have-unlimited-duration.html) | all | 904 | [Available](https://github.com/RichardDaffern/Novel_Library/actions/runs/42513475192/artifacts/13636307740) | 2026-11-15T22:04:49Z |
 | [Cultivation Online](https://novelfull.com/cultivation-online.html) | all | 2701 | [Available](https://github.com/RichardDaffern/Novel_Library/actions/runs/42513475192/artifacts/13636934179) | 2026-11-15T22:36:34Z |
+| [Cultivation! My Augmented Statuses Have Unlimited Duration](https://novelfull.com/cultivation-my-augmented-statuses-have-unlimited-duration.html) | all | 904 | [Available](https://github.com/RichardDaffern/Novel_Library/actions/runs/42513475192/artifacts/13636307740) | 2026-11-15T22:04:49Z |
 | [Devil’s Son-in-Law](https://novelfull.com/devils-son-in-law.html) | all | 1275 | [Available](https://github.com/RichardDaffern/Novel_Library/actions/runs/42513475192/artifacts/13644028986) | 2026-11-16T01:59:32Z |
 | [Divine Beast Adventures](https://novelfull.com/divine-beast-adventures.html) | all | 581 | [Available](https://github.com/RichardDaffern/Novel_Library/actions/runs/42513475192/artifacts/13645946310) | 2026-11-16T02:34:21Z |
 | [Dragon King’s Son-In-Law](https://novelfull.com/dragon-kings-son-in-law.html) | all | 790 | [Available](https://github.com/RichardDaffern/Novel_Library/actions/runs/42513475192/artifacts/13644867109) | 2026-11-16T02:11:20Z |
@@ -25,8 +27,8 @@ Expired artifacts cannot be retrieved; such entries remain as history but will n
 | [God Rank Upgrade System](https://novelfull.com/god-rank-upgrade-system.html) | all | 1479 | [Available](https://github.com/RichardDaffern/Novel_Library/actions/runs/42513447856/artifacts/13644734351) | 2026-11-16T02:33:38Z |
 | [Godly Model Creator](https://novelfull.com/godly-model-creator.html) | all | 1085 | [Available](https://github.com/RichardDaffern/Novel_Library/actions/runs/42513447856/artifacts/13645836077) | 2026-11-16T02:36:42Z |
 | [Great Demon King](https://novelfull.com/great-demon-king.html) | all | 1028 | [Available](https://github.com/RichardDaffern/Novel_Library/actions/runs/42513447856/artifacts/13650731871) | 2026-11-16T04:51:47Z |
-| [Heavenly Jewel Change](https://novelfull.com/heavenly-jewel-change.html) | all | 848 | [Available](https://github.com/RichardDaffern/Novel_Library/actions/runs/42513447856/artifacts/13654852471) | 2026-11-16T06:45:33Z |
 | [Heaven’s Devourer](https://novelfull.com/heavens-devourer.html) | all | 1829 | [Available](https://github.com/RichardDaffern/Novel_Library/actions/runs/42513447856/artifacts/13654866424) | 2026-11-16T06:46:01Z |
+| [Heavenly Jewel Change](https://novelfull.com/heavenly-jewel-change.html) | all | 848 | [Available](https://github.com/RichardDaffern/Novel_Library/actions/runs/42513447856/artifacts/13654852471) | 2026-11-16T06:45:33Z |
 | [I Alone Level-Up](https://novelfull.com/i-alone-level-up.html) | all | 270 | [Available](https://github.com/RichardDaffern/Novel_Library/actions/runs/42513348683/artifacts/13634103379) | 2026-11-15T21:14:14Z |
 | [I am a Gao Fushuai Villain](https://novelfull.com/i-am-a-gao-fushuai-villain.html) | all | 650 | [Available](https://github.com/RichardDaffern/Novel_Library/actions/runs/42513447856/artifacts/13655021841) | 2026-11-16T06:53:24Z |
 | [I am the Monarch](https://novelfull.com/i-am-the-monarch.html) | all | 336 | [Available](https://github.com/RichardDaffern/Novel_Library/actions/runs/42513431015/artifacts/13634498595) | 2026-11-15T21:18:11Z |
@@ -58,14 +60,14 @@ Expired artifacts cannot be retrieved; such entries remain as history but will n
 | [Otherworldly Evil Monarch](https://novelfull.com/otherworldly-evil-monarch.html) | all | 1277 | [Available](https://github.com/RichardDaffern/Novel_Library/actions/runs/42513387437/artifacts/13651825998) | 2026-11-16T05:16:29Z |
 | [Painting of the Nine Immortals](https://novelfull.com/painting-of-the-nine-immortals.html) | all | 1003 | [Available](https://github.com/RichardDaffern/Novel_Library/actions/runs/42513387437/artifacts/13652262814) | 2026-11-16T05:39:07Z |
 | [Peerless Battle Spirit](https://novelfull.com/peerless-battle-spirit.html) | all | 2347 | [Available](https://github.com/RichardDaffern/Novel_Library/actions/runs/42513387437/artifacts/13655961833) | 2026-11-16T07:14:05Z |
-| [Peerless Martial God 2](https://novelfull.com/peerless-martial-god-2.html) | all | 1740 | [Available](https://github.com/RichardDaffern/Novel_Library/actions/runs/42513387437/artifacts/13657212387) | 2026-11-16T07:46:27Z |
 | [Peerless Martial God](https://novelfull.com/peerless-martial-god.html) | all | 2500 | [Available](https://github.com/RichardDaffern/Novel_Library/actions/runs/42513387437/artifacts/13656579422) | 2026-11-16T07:41:29Z |
+| [Peerless Martial God 2](https://novelfull.com/peerless-martial-god-2.html) | all | 1740 | [Available](https://github.com/RichardDaffern/Novel_Library/actions/runs/42513387437/artifacts/13657212387) | 2026-11-16T07:46:27Z |
 | [Please, I Really Didn’t Want To Fall in Love With My Master!](https://novelfull.com/please-i-really-didnt-want-to-fall-in-love-with-my-master.html) | all | 381 | [Available](https://github.com/RichardDaffern/Novel_Library/actions/runs/42513387437/artifacts/13658476779) | 2026-11-16T08:08:54Z |
 | [Pocket Hunting Dimension](https://novelfull.com/pocket-hunting-dimension.html) | all | 1331 | [Available](https://github.com/RichardDaffern/Novel_Library/actions/runs/42513372924/artifacts/13636450844) | 2026-11-15T21:58:32Z |
 | [Power and Wealth](https://novelfull.com/power-and-wealth.html) | all | 2030 | [Available](https://github.com/RichardDaffern/Novel_Library/actions/runs/42513372924/artifacts/13636587131) | 2026-11-15T22:12:29Z |
 | [Re: Evolution Online](https://novelfull.com/re-evolution-online.html) | all | 1474 | [Available](https://github.com/RichardDaffern/Novel_Library/actions/runs/42513372924/artifacts/13636850090) | 2026-11-15T22:09:50Z |
-| [Rebirth: How a Loser Became a Prince Charming](https://novelfull.com/rebirth-how-a-loser-became-a-prince-charming.html) | all | 1009 | [Available](https://github.com/RichardDaffern/Novel_Library/actions/runs/42513372924/artifacts/13644466550) | 2026-11-16T02:00:06Z |
 | [Rebirth of the Thief Who Roamed the World](https://novelfull.com/rebirth-of-the-thief-who-roamed-the-world.html) | all | 995 | [Available](https://github.com/RichardDaffern/Novel_Library/actions/runs/42513372924/artifacts/13644082254) | 2026-11-16T02:00:29Z |
+| [Rebirth: How a Loser Became a Prince Charming](https://novelfull.com/rebirth-how-a-loser-became-a-prince-charming.html) | all | 1009 | [Available](https://github.com/RichardDaffern/Novel_Library/actions/runs/42513372924/artifacts/13644466550) | 2026-11-16T02:00:06Z |
 | [Refining the Mountains and Rivers](https://novelfull.com/refining-the-mountains-and-rivers.html) | all | 2203 | [Available](https://github.com/RichardDaffern/Novel_Library/actions/runs/42513372924/artifacts/13651824997) | 2026-11-16T05:40:38Z |
 | [Renegade Immortal](https://novelfull.com/renegade-immortal.html) | all | 2093 | [Available](https://github.com/RichardDaffern/Novel_Library/actions/runs/42513372924/artifacts/13652597481) | 2026-11-16T05:44:54Z |
 | [Returning from the Immortal World](https://novelfull.com/returning-from-the-immortal-world.html) | all | 1443 | [Available](https://github.com/RichardDaffern/Novel_Library/actions/runs/42513372924/artifacts/13653522551) | 2026-11-16T06:14:20Z |

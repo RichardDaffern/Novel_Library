@@ -107,13 +107,16 @@ class PublishRegistryTests(unittest.TestCase):
 
     def test_workflow_uses_dynamic_parallelism_and_safe_pr_merger(self):
         workflow = Path(".github/workflows/download-novel.yml").read_text(encoding="utf-8")
-        bulk = Path(".github/workflows/bulk-download-novels.yml").read_text(encoding="utf-8")
+        bulk = Path(".github/workflows/library-bulk-download.yml").read_text(encoding="utf-8")
         self.assertIn("max-parallel: ${{ fromJSON(needs.prepare.outputs.parallelism) }}", workflow)
         self.assertIn("parallelism: ${{ steps.make_plan.outputs.parallelism }}", workflow)
         self.assertIn("group: novel-download-${{ inputs.novel_url }}", workflow)
         self.assertNotIn("group: novel-library-registry", workflow)
         self.assertIn("python -u -m tools.publish_registry", workflow)
         self.assertIn("max-parallel: 3", bulk)
+        self.assertIn("max-parallel: 2", bulk)
+        self.assertIn("uses: ./.github/workflows/download-novel.yml", bulk)
+        self.assertIn("uses: ./.github/workflows/freewebnovel-download.yml", bulk)
 
 
 if __name__ == "__main__":
