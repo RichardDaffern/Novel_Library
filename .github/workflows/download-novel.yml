@@ -1,4 +1,4 @@
-name: NovelFull Download
+name: NovelFull - Download
 
 on:
   workflow_dispatch:
