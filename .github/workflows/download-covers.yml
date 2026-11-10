@@ -1,0 +1,74 @@
+name: Covers - Download
+
+on:
+  workflow_dispatch:
+    inputs:
+      website:
+        description: 'Website group from DOWNLOADED_NOVELS.md'
+        required: true
+        type: choice
+        options:
+          - All
+          - NovelFull
+          - FreeWebNovel
+        default: All
+      limit:
+        description: 'Number of indexed novels to check (0 = all)'
+        type: number
+        required: true
+        default: 0
+      force:
+        description: 'Replace existing cover images'
+        type: boolean
+        default: false
+      confirm_rights:
+        description: 'Confirm permission to save the cover images'
+        type: boolean
+        required: true
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  covers:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Install cover utilities
+        run: python -m pip install -r requirements.txt
+      - name: Download covers only (no EPUBs or chapters)
+        env:
+          WEBSITE: ${{ inputs.website }}
+          LIMIT: ${{ inputs.limit }}
+          FORCE: ${{ inputs.force }}
+          CONFIRM_RIGHTS: ${{ inputs.confirm_rights }}
+        run: |
+          args=(python -u -m tools.download_covers
+            --index DOWNLOADED_NOVELS.md
+            --output-dir Downloaded_Covers
+            --website "$WEBSITE"
+            --limit "$LIMIT")
+          if [[ "$CONFIRM_RIGHTS" != "true" ]]; then
+            echo "::error::Please confirm permission to save these cover images."
+            exit 1
+          fi
+          args+=(--confirm-rights)
+          if [[ "$FORCE" == "true" ]]; then args+=(--force); fi
+          "${args[@]}"
+      - name: Upload cover-only collection
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: novel-cover-images
+          path: Downloaded_Covers/
+          retention-days: 30
+          if-no-files-found: ignore
+          compression-level: 6
