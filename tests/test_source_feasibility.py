@@ -106,23 +106,24 @@ class ExperimentalSourcesTests(unittest.TestCase):
             self.assertTrue(saved["two_chapter_static_feasible"])
             self.assertNotIn(PROSE[:80], report.read_text(encoding="utf-8"))
 
-    def test_restored_site_bulk_menus_reuse_common_implementation(self):
-        common = Path(".github/workflows/library-bulk-download.yml").read_text(encoding="utf-8")
-        self.assertIn("  workflow_call:", common)
+    def test_single_bulk_action_remains_and_extra_menus_are_absent(self):
+        common = Path(".github/workflows/library-bulk-download.yml").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("name: Library - Bulk Download", common)
         self.assertIn("  workflow_dispatch:", common)
+        self.assertNotIn("  workflow_call:", common)
+        self.assertIn("          - All", common)
+        self.assertIn("          - NovelFull", common)
+        self.assertIn("          - FreeWebNovel", common)
         self.assertIn("    uses: ./.github/workflows/download-novel.yml", common)
         self.assertIn("    uses: ./.github/workflows/freewebnovel-download.yml", common)
-        for website, filename in (("NovelFull", "novelfull-bulk-download.yml"),
-                                  ("FreeWebNovel", "freewebnovel-bulk-download.yml")):
-            wrapper = Path(".github/workflows", filename).read_text(encoding="utf-8")
-            self.assertIn(f"name: {website} - Bulk Download", wrapper)
-            self.assertIn("  workflow_dispatch:", wrapper)
-            self.assertIn("uses: ./.github/workflows/library-bulk-download.yml", wrapper)
-            self.assertIn(f"website: {website}", wrapper)
-            for name in ("novel_names", "novel_urls", "chapter_range", "force"):
-                self.assertIn("      " + name + ": ${{ inputs." + name + " }}", wrapper)
-            self.assertNotIn("python -u -m tools.chunked_download", wrapper)
-            self.assertNotIn("python -u -m tools.freewebnovel_chunks", wrapper)
+        self.assertIn("max-parallel: 3", common)
+        self.assertIn("max-parallel: 2", common)
+        for redundant in (
+            "novelfull-bulk-download.yml", "freewebnovel-bulk-download.yml"
+        ):
+            self.assertFalse((Path(".github/workflows") / redundant).exists())
 
 
 if __name__ == "__main__":
