@@ -82,6 +82,41 @@ class ChapterBatchTests(unittest.TestCase):
             epub_meta, _ = epub_chapters(book / "source.epub")
             self.assertEqual(epub_meta["title"], "A Synthetic Very Long Story")
 
+    def test_synopsis_survives_multi_batch_final_epub_and_json(self):
+        plan = chapter_plan(URL, 4, "1-4", chunk_size=2)
+        synopsis = "A protagonist chooses his own path. & A twist <appears>."
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            parts = root / "parts"
+            make_piece(parts, URL, plan["key"], 1, 2)
+            later = make_piece(parts, URL, plan["key"], 3, 4)
+            meta_path = later / "book" / "metadata.json"
+            meta = json.loads(meta_path.read_text(encoding="utf-8"))
+            meta["description"] = synopsis
+            meta_path.write_text(json.dumps(meta), encoding="utf-8")
+            output = assemble(plan, parts, root / "downloads")
+            metadata = json.loads((output / "metadata.json").read_text(encoding="utf-8"))
+            self.assertEqual(metadata["description"], synopsis)
+            self.assertEqual(metadata["synopsis"], synopsis)
+            epub_metadata, chapters = epub_chapters(output / "source.epub")
+            self.assertEqual(epub_metadata["description"], synopsis)
+            self.assertEqual(len(chapters), 4)
+            with zipfile.ZipFile(output / "source.epub") as z:
+                self.assertIsNone(z.testzip())
+                opf = z.read("OEBPS/content.opf").decode("utf-8")
+                self.assertIn("<dc:description>", opf)
+                self.assertIn("&amp;", opf)
+                self.assertIn("&lt;appears&gt;", opf)
+
+    def test_no_source_synopsis_does_not_invent_one(self):
+        plan = chapter_plan(URL, 2, "1-2", chunk_size=2)
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            make_piece(root / "parts", URL, plan["key"], 1, 2)
+            output = assemble(plan, root / "parts", root / "downloads")
+            data = json.loads((output / "metadata.json").read_text())
+            self.assertNotIn("description", data)
+            self.assertNotIn("description", epub_chapters(output / "source.epub")[0])
     def test_fanficfare_formatted_chapter_counts(self):
         for value in ("4,035", "4035", 4035, " 4,035 "):
             with self.subTest(value=value):
