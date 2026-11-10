@@ -137,6 +137,17 @@ def validate_piece(folder: Path, url: str, key: str, first: int, last: int) -> d
         raise ValueError("Chapter batch manifest and metadata counts differ")
     if not (book_dir / "source.epub").is_file():
         raise ValueError("Missing source EPUB in chapter batch")
+    cover_name = metadata.get("cover_image")
+    if cover_name:
+        if cover_name not in ("cover.jpg", "cover.png"):
+            raise ValueError("Invalid cover filename in chapter batch metadata")
+        cover_path = book_dir / cover_name
+        if not cover_path.is_file() or cover_path.stat().st_size > 8 * 1024 * 1024:
+            raise ValueError("Missing or oversized chapter-batch cover image")
+        from tools.novel_covers import validate_image
+        data, extension = validate_image(cover_path.read_bytes())
+        if extension != cover_path.suffix.lower():
+            raise ValueError("Cover file extension does not match its format")
     for row in rows:
         name = row.get("file", "")
         if not name or Path(name).name != name:
