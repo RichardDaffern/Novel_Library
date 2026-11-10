@@ -78,8 +78,7 @@ function Test-NovelZip([string]$path, [string]$novelUrl) {
     } catch { return $false } finally { if ($archive) { $archive.Dispose() } }
 }
 function Get-ExistingNovelZipIndex([string[]]$directories) {
-    # Examine local ZIPs once, rather than testing every archive against every
-    # novel. Identify books by the URL in metadata.json, never the ZIP filename.
+    # Check ZIPs only once. Identity comes from metadata.json, not the name.
     $index = @{}
     $visited = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
     foreach ($directory in $directories) {
@@ -90,34 +89,13 @@ function Get-ExistingNovelZipIndex([string[]]$directories) {
             $archive = $null
             try {
                 $archive = [System.IO.Compression.ZipFile]::OpenRead($file.FullName)
-                $metadata = @($archive.Entries | Where-Object { $_.FullName -match '^[^/]+/metadata\.json
-    $book = Get-ValidBook $sourceDirectory $novelUrl
-    if (Test-Path -LiteralPath $zipPath) { throw "Refusing to overwrite an existing ZIP: $zipPath" }
-    $temporary = "$zipPath.tmp"
-    if (Test-Path -LiteralPath $temporary) { Remove-Item -LiteralPath $temporary -Force }
-    $archive = $null
-    try {
-        $archive = [System.IO.Compression.ZipFile]::Open($temporary, [System.IO.Compression.ZipArchiveMode]::Create)
-        $files = @($book.Chapters) + @((Join-Path $book.Directory 'chapters.json'), (Join-Path $book.Directory 'metadata.json'), (Join-Path $book.Directory 'source.epub'))
-        foreach ($file in $files) {
-            $entryName = (Get-NovelSlug $novelUrl) + '/' + [System.IO.Path]::GetFileName($file)
-            [void][System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile($archive, $file, $entryName, [System.IO.Compression.CompressionLevel]::Optimal)
-        }
-    } finally { if ($archive) { $archive.Dispose() } }
-    if (-not (Test-NovelZip $temporary $novelUrl)) {
-        Remove-Item -LiteralPath $temporary -Force -ErrorAction SilentlyContinue
-        throw "New ZIP failed structural validation: $novelUrl"
-    }
-    Move-Item -LiteralPath $temporary -Destination $zipPath
-    Write-Host "  Created $([System.IO.Path]::GetFileName($zipPath)) ($($book.Count) chapters)" -ForegroundColor Green
-} })
+                $metadata = @($archive.Entries | Where-Object { $_.FullName.EndsWith('/metadata.json') -and ($_.FullName.Split('/').Count -eq 2) })
                 if ($metadata.Count -ne 1) { continue }
                 $reader = [System.IO.StreamReader]::new($metadata[0].Open())
                 try { $details = $reader.ReadToEnd() | ConvertFrom-Json }
                 finally { $reader.Dispose() }
                 $sourceUrl = [string]$details.source_url
                 $key = Get-NovelKey $sourceUrl
-                # Close the archive before Test-NovelZip opens it separately.
                 $archive.Dispose()
                 $archive = $null
                 if ($key -and -not $index.ContainsKey($key) -and (Test-NovelZip $file.FullName $sourceUrl)) {
