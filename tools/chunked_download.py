@@ -169,16 +169,17 @@ def _prior_artifacts(name: str, repository: str) -> list[dict]:
 
 
 def cache_has_synopsis_support(metadata: dict, url: str) -> bool:
-    """Never reuse pre-fix NovelFull batches that could silently lose a synopsis.
+    """Reject old supported-site chapter batches lacking metadata capabilities.
 
-    This is a pipeline capability marker, not a claim that every source
-    provides a description. Other website adapters retain legacy cache
-    compatibility.
+    Markers indicate the downloader *supports* a synopsis/cover. A source
+    novel may genuinely have neither. Other sites are left compatible.
     """
     host = (urlsplit(url).hostname or "").lower().removeprefix("www.")
-    if host != "novelfull.com":
-        return True
-    return metadata.get("synopsis_pipeline_version") == 2
+    if host == "novelfull.com" and metadata.get("synopsis_pipeline_version") != 2:
+        return False
+    if host in {"novelfull.com", "freewebnovel.com"}:
+        return metadata.get("cover_pipeline_version") == 1
+    return True
 
 
 def reuse_complete_piece(folder: Path, url: str, key: str, first: int, last: int) -> bool:
@@ -196,7 +197,7 @@ def reuse_complete_piece(folder: Path, url: str, key: str, first: int, last: int
                 )
                 verified = validate_piece(candidate, url, key, first, last)
                 if not cache_has_synopsis_support(verified["metadata"], url):
-                    raise ValueError("Legacy NovelFull batch lacks synopsis preservation; download afresh")
+                    raise ValueError("Cached batch predates synopsis/cover metadata support; download afresh")
                 shutil.copytree(candidate, folder, dirs_exist_ok=True)
                 print(f"REUSED completed chapters {first}-{last} from run {run}", flush=True)
                 return True
