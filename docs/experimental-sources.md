@@ -68,3 +68,73 @@ The tool never requests websites and cannot bypass login/challenges.
 
 Because these conditions are not yet met, current support is **offline
 feasibility rather than automated downloads**.
+
+
+## WTR-Lab and Royal Road: current safe integration
+
+Neither source has been added to live automated downloads. Their source
+policies and permissions must be respected.
+
+### WTR-Lab
+
+- Novel URLs now include `https://wtr-lab.com/en/novel/6965/myriad-paths`;
+  example chapters use a following `/chapter-1` path.
+- Its official Terms restrict automated requests and downloading or
+  copying site content unless expressly permitted.
+- AI-translated chapters may be ticket-locked. The first 50 chapters can
+  initially be unlocked; that is not an export permission.
+- Do not use login automation, internal APIs, paywall workarounds or
+  harvesting of locked AI content.
+
+Sources:
+https://wtr-lab.com/en/terms-of-use
+https://wtr-lab.com/en/faq/2/chapter-unlock-system
+https://wtr-lab.com/en/news/115
+
+### Royal Road
+
+- Book URLs use `/fiction/<id>/<slug>`. Chapter URLs use
+  `/fiction/<id>/<slug>/chapter/<chapter-id>/<chapter-slug>`.
+- Chapter IDs are *not* reading positions. Our offline feasibility parser
+  preserves the supplied table-of-contents order instead of sorting IDs.
+- FanFicFare 4.63 contains an actively maintained Royal Road adapter.
+  This does not itself establish permission to crawl or archive content.
+- Royal Road's Author Premium allows authors to export EPUBs of their
+  own fiction from the author dashboard.
+
+Sources:
+https://github.com/JimmXinu/FanFicFare/releases
+https://www.royalroad.com/support/knowledgebase/110
+https://www.royalroad.com/support/knowledgebase/108
+
+### Offline feasibility
+
+`tools/source_feasibility.py` now supports NovelFire, LightNovelPub,
+WTRLab and RoyalRoad URL formats, using only HTML that was already
+saved through permitted means. The parser checks the book title,
+author where present, chapter list and up to two saved chapter pages
+without outputting prose or contacting sites.
+
+~~~powershell
+python -m tools.source_feasibility "https://wtr-lab.com/en/novel/6965/myriad-paths" --book-html "book.html" --index-html "chapters.html"
+python -m tools.source_feasibility "https://royalroad.com/fiction/21220/mother-of-learning" --book-html "book.html" --index-html "chapters.html"
+~~~
+
+### Convert an already-authorised EPUB to a proper novel ZIP
+
+`tools/import_local_epub.py` packages a locally provided EPUB into the
+same portable structure as our existing novel ZIPs. It reuses the
+existing tested EPUB exporter, then verifies ZIP CRC, chapter SHA-256,
+chapter count, source metadata and optional cover before publication.
+The input EPUB is never modified; existing output ZIPs are not
+overwritten unless `--replace` is explicit.
+
+~~~powershell
+python -m tools.import_local_epub --epub "My Author Export.epub" --source-url "https://royalroad.com/fiction/21220/mother-of-learning" --output-dir Imported_Novels --confirm-rights
+python -m tools.import_local_epub --epub "My Permitted Export.epub" --source-url "https://wtr-lab.com/en/novel/6965/myriad-paths" --output-dir Imported_Novels --confirm-rights
+~~~
+
+The examples illustrate file conversion for content you are permitted to
+keep, **not** permission to archive those example novels. The tool never
+downloads the EPUB or any chapters. A new WTR-Lab or Royal Road bulk option
+is deliberately disabled until reliable, permitted access is confirmed.

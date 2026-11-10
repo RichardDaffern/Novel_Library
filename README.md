@@ -55,24 +55,12 @@ For automatic PR creation and merging, the repository owner must enable **Settin
 
 **Important:** Your repository is currently public. GitHub Actions artifacts may be accessible to other users of public repositories. Making a repository private limits exposure but does not grant permission to redistribute copyrighted content.
 
-## Website-specific bulk download actions
-
-The GitHub Actions menu also has two dedicated entries:
-
-- **NovelFull - Bulk Download**: Opens a bulk form already locked to NovelFull.
-- **FreeWebNovel - Bulk Download**: Opens a bulk form already locked to FreeWebNovel.
-
-These are lightweight wrappers around **Library - Bulk Download**, not new
-downloader implementations. They accept the same semicolon-separated saved
-novel names, optional novel URLs, chapter range, and Force flag, and reuse
-the same validated planning, duplicate skipping, ZIP assembly and registry
-publication paths. The existing **Library - Bulk Download** remains available
-for mixing the two websites. The individual single-novel actions are unchanged.
-
 ## GitHub Actions: Library - Bulk Download
 
 Use **Actions > Library - Bulk Download > Run workflow** for downloads from
-both supported websites. The workflow groups download jobs by website,
+both supported websites. **This is the only bulk workflow**; choose the website
+in its dropdown (All, NovelFull or FreeWebNovel). Separate site-specific
+bulk menus are redundant and have been removed. The workflow groups download jobs by website,
 without changing the individual site-specific downloaders.
 
 - **Website group:** All, NovelFull or FreeWebNovel.
@@ -155,6 +143,29 @@ python -m tools.freewebnovel_downloader "https://freewebnovel.com/novel/the-firs
 
 The standalone downloader supports batches of at most 100 chapters.
 The Actions workflow handles partitioning for longer novels.
+
+## WTR-Lab and Royal Road: offline integration
+
+New source investigations are documented in
+[experimental-sources.md](docs/experimental-sources.md), including WTR-Lab's
+current URL formats, Royal Road's chapter-ID ordering, published access
+restrictions and the limits of automated downloading.
+
+For **EPUB files you are already authorised to keep**, you can import them
+into a complete, verified novel ZIP without contacting either website:
+
+~~~powershell
+python -m tools.import_local_epub --epub "Author Export.epub" --source-url "https://royalroad.com/fiction/21220/mother-of-learning" --confirm-rights
+~~~
+
+The output is `Imported_Novels/novel-<stable-URL-hash>.zip`, with original
+EPUB, chapter TXT files, JSON manifests, and any EPUB synopsis/cover. It is
+validated before publication; an existing ZIP will not be replaced unless
+`--replace` is explicitly requested. This is **not a website downloader**:
+it requires the user to supply an authorised EPUB. WTR-Lab's published terms
+restrict automated requests and downloading, and Royal Road's existing
+FanFicFare adapter does not grant blanket permission to archive other
+authors' works. Neither source has been enabled in live GitHub Actions.
 
 ## Novel Fire and Light Novel Pub: isolated feasibility stage
 

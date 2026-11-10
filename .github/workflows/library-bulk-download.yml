@@ -30,33 +30,6 @@ on:
         type: boolean
         default: false
 
-  workflow_call:
-    inputs:
-      website:
-        description: 'Website group (All, NovelFull, FreeWebNovel)'
-        required: true
-        type: string
-      novel_names:
-        description: 'Optional semicolon/comma-separated saved novel titles'
-        required: false
-        type: string
-        default: ''
-      novel_urls:
-        description: 'Optional new book URLs'
-        required: false
-        type: string
-        default: ''
-      chapter_range:
-        description: 'Optional inclusive chapter range'
-        required: false
-        type: string
-        default: ''
-      force:
-        description: 'Redownload even if a valid archive exists'
-        required: false
-        type: boolean
-        default: false
-
 permissions:
   contents: write
   pull-requests: write

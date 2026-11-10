@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Offline feasibility analysis of two possible novel sources.
+"""Offline feasibility analysis of four possible novel sources.
 
 This is NOT a network crawler or novel downloader. Read locally saved HTML
 from a book information page, optional chapter list, and at most TWO chapter
 pages, without contacting the websites, logging prose, or creating EPUBs.
-Novel Fire prohibits scraping in its published terms. Do not use automated
-requests to work around access controls or the site's restrictions.
+Access/download permissions differ by site. WTR-Lab prohibits automated
+requests and downloading absent permission; never bypass locks or challenges.
 """
 from __future__ import annotations
 
@@ -22,11 +22,19 @@ from bs4 import BeautifulSoup
 SITES = {
     "novelfire.net": ("NovelFire", re.compile(r"^/book/[a-z0-9]+(?:-[a-z0-9]+)*/?$")),
     "lightnovelpub.com": ("LightNovelPub", re.compile(r"^/novel/[a-z0-9]+(?:-[a-z0-9]+)*/?$")),
+    # WTR-Lab changed /serie-<id> to /en/novel/<id>/<slug> in 2025.
+    "wtr-lab.com": ("WTRLab", re.compile(
+        r"^/(?:en/)?novel/[1-9][0-9]*(?:/[a-z0-9]+(?:-[a-z0-9]+)*)?/?$"
+    )),
+    "royalroad.com": ("RoyalRoad", re.compile(
+        r"^/fiction/[1-9][0-9]*(?:/[a-z0-9]+(?:-[a-z0-9]+)*)?/?$"
+    )),
 }
 MAX_HTML_BYTES = 4 * 1024 * 1024
 LOCK_MARKERS = (
     "purchase this chapter", "pay to unlock", "chapter is locked",
     "please complete captcha", "verify you are human",
+    "unlock chapter", "requires tickets", "premium chapter",
     "just a moment...", "enable javascript and cookies to continue",
 )
 CHAPTER_SELECTORS = (
@@ -110,27 +118,56 @@ def parse_chapter_links(html: str, book_url: str) -> list[dict]:
     site, canonical = validate_book_url(book_url)
     parsed = urlsplit(canonical)
     book_path = parsed.path
-    results: dict[int, dict] = {}
+    results: dict[int | str, dict] = {}
     soup = BeautifulSoup(html, "html.parser")
     for link in soup.select("a[href]"):
         candidate = urljoin(canonical + "/", link.get("href", ""))
         parts = urlsplit(candidate)
-        if (parts.scheme != "https" or parts.hostname != parsed.hostname
+        if (parts.scheme != "https" or
+                (parts.hostname or "").removeprefix("www.") !=
+                (parsed.hostname or "").removeprefix("www.")
                 or parts.query or parts.fragment):
             continue
-        # Only accept chapters whose URL belongs to this exact book; do not
-        # infer indices from titles or follow cross-book links.
-        match = re.fullmatch(re.escape(book_path) + r"/chapter-([1-9][0-9]*)/?", parts.path)
-        if not match:
-            continue
-        number = int(match.group(1))
-        title = link.get_text(" ", strip=True)
-        if number not in results:
+        if site == "RoyalRoad":
+            # Royal Road IDs are not sequential chapter positions. Order here
+            # is the order in the SAVED table of contents, not by chapter ID.
+            match = re.fullmatch(
+                re.escape(book_path) +
+                r"/chapter/([1-9][0-9]*)(?:/[a-z0-9-]+)?/?",
+                parts.path,
+            )
+            if not match:
+                continue
+            number: int | str = match.group(1)
+            if number in results:
+                continue
+            results[number] = {
+                "position": len(results) + 1,
+                "chapter_id": number,
+                "url": candidate.rstrip("/"),
+                "title": link.get_text(" ", strip=True)[:250] or
+                         f"Chapter {len(results) + 1}",
+            }
+        else:
+            # Book-local numbered chapter links; WTR-Lab currently uses
+            # /en/novel/<id>/<slug>/chapter-1. Never guess non-numeric IDs.
+            match = re.fullmatch(
+                re.escape(book_path) + r"/chapter-([1-9][0-9]*)/?",
+                parts.path,
+            )
+            if not match:
+                continue
+            number = int(match.group(1))
+            if number in results:
+                continue
             results[number] = {
                 "position": number,
                 "url": candidate.rstrip("/"),
-                "title": title[:250] or f"Chapter {number}",
+                "title": link.get_text(" ", strip=True)[:250] or
+                         f"Chapter {number}",
             }
+    if site == "RoyalRoad":
+        return list(results.values())
     return [results[key] for key in sorted(results)]
 
 
