@@ -14,6 +14,7 @@ import json
 import os
 from pathlib import Path
 import re
+from urllib.parse import urlsplit
 
 from tools.bulk_download import MAX_NOVELS, parse_novel_urls
 from tools.download_registry import (
@@ -38,9 +39,9 @@ def _validated_url(value: str) -> tuple[str, str]:
         return site, validate_book_url(url)
     if site == "NovelFull":
         # Prevent accidental use of unsupported websites/novel pages.
-        if not re.fullmatch(r"/[a-z0-9_-]+\.html", __import__("urllib.parse", fromlist=["urlsplit"]).urlsplit(url).path):
+        if not re.fullmatch(r"/[a-z0-9_-]+\.html", urlsplit(url).path):
             raise ValueError("NovelFull URLs must point to /novel-name.html")
-        if __import__("urllib.parse", fromlist=["urlsplit"]).urlsplit(url).query:
+        if urlsplit(url).query:
             raise ValueError("NovelFull URL must not include query parameters")
         return site, url
     raise ValueError(f"Unsupported website: {site}. Supported: {', '.join(SITES)}")
