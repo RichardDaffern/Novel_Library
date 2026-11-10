@@ -183,6 +183,18 @@ Books whose source does not supply a description are left blank rather than
 given fabricated text. The preservation fix applies to **newly created**
 download artifacts; it does not rewrite existing GitHub artifacts.
 
+NovelFull chapter batches now carry a synopsis-preserving pipeline version.
+If GitHub Actions finds a cached batch created **before** that fix, it will
+reject that cached batch and download the range afresh instead of reusing
+metadata that may have lost the synopsis. New-format batches remain reusable.
+This check does not affect FreeWebNovel. If the original source itself lacks
+a description, the assembled novel still cannot have a source synopsis;
+the assembly logs a visible warning rather than inventing one.
+
+Previously completed ZIP artifacts remain unchanged. To redownload an
+already registered novel, select **Force** in its single download action,
+or use the ZIP synopsis repair command below to avoid downloading chapters.
+
 To repair downloaded ZIPs **without downloading any chapters again**, use
 the separate `tools/repair_synopsis.py` command. It checks whether the
 existing ZIP's EPUB or metadata already contains a synopsis. Otherwise, it
