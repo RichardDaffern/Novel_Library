@@ -4,15 +4,19 @@ on:
   pull_request:
     paths:
       - 'tools/pdf_to_novel.py'
+      - 'tools/pdf_batch.py'
       - 'requirements-pdf.txt'
       - 'tests_pdf/**'
+      - 'PDF-to-Novel/**'
       - '.github/workflows/pdf-conversion-ci.yml'
   push:
     branches: [main]
     paths:
       - 'tools/pdf_to_novel.py'
+      - 'tools/pdf_batch.py'
       - 'requirements-pdf.txt'
       - 'tests_pdf/**'
+      - 'PDF-to-Novel/**'
   workflow_dispatch:
 
 jobs:
@@ -30,5 +34,5 @@ jobs:
           python-version: '3.12'
       - name: Install offline PDF converter dependencies
         run: python -m pip install -r requirements-pdf.txt
-      - name: Run synthetic-PDF regression tests without network calls
-        run: python -m unittest discover -s tests_pdf -p test_pdf_to_novel.py -v
+      - name: Run synthetic-PDF and batch regression tests (includes CMD on Windows)
+        run: python -m unittest discover -s tests_pdf -p test_pdf_*.py -v
