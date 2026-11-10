@@ -151,6 +151,14 @@ def epub_chapters(epub_path: Path) -> tuple[dict, list[dict]]:
 def export_epub(epub_path: Path, output_dir: Path, source_url: str | None = None, first_position: int = 1) -> dict:
     book, chapters = epub_chapters(epub_path)
     output_dir.mkdir(parents=True, exist_ok=True)
+    from tools.novel_covers import extract_epub_cover, write_cover
+    cover = extract_epub_cover(epub_path)
+    if cover:
+        book["cover_image"] = write_cover(output_dir, *cover)
+    else:
+        # A previously exported cover must not be mistaken for this EPUB's artwork.
+        for suffix in (".jpg", ".png"):
+            (output_dir / ("cover" + suffix)).unlink(missing_ok=True)
     used_names = set()
     results = []
     next_number = 1
