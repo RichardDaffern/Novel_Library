@@ -1,0 +1,27 @@
+name: Temporary cover-fix branch cleanup
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/cleanup-cover-fix-branch-once.yml
+permissions:
+  contents: write
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete the merged cover-fix branch only if its tip has not moved
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          expected='9d7e1ce20bfc6ac48d13ab2392e9013eea812d55'
+          name='fix/novelfull-cover-markup'
+          actual=$(gh api "repos/${REPOSITORY}/git/ref/heads/${name}" --jq '.object.sha')
+          if [[ "$actual" != "$expected" ]]; then
+            echo "::error::Branch moved; preserving current work"
+            exit 1
+          fi
+          gh api -X DELETE "repos/${REPOSITORY}/git/refs/heads/${name}"
+          echo "Deleted merged branch ${name}"
