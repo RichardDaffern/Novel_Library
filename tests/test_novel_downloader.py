@@ -40,6 +40,7 @@ class NovelDownloaderTests(unittest.TestCase):
             archive = self.make_epub(root)
             metadata = export_epub(archive, root / "out", "https://example.com/novel")
             self.assertEqual(metadata["chapter_count"], 3)
+            self.assertEqual(metadata["synopsis_pipeline_version"], 2)
             names = [row["file"] for row in json.loads((root / "out/chapters.json").read_text())]
             self.assertEqual(names, ["chapter_0000_prologue.txt", "chapter_0001.txt", "chapter_0002.txt"])
             self.assertIn("Paragraph 1.\n\nMore text here.", (root / "out/chapter_0001.txt").read_text())
