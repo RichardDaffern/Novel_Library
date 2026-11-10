@@ -83,7 +83,13 @@ def epub_chapters(epub_path: Path) -> tuple[dict, list[dict]]:
         # HTML inside dc:description. Keep plain, readable text in metadata.
         raw_description = _first_text(package, "description")
         if raw_description:
-            description = BeautifulSoup(raw_description, "html.parser").get_text("\n", strip=True).strip()
+            # Decode real HTML snippets, but do not treat literal angle-bracket
+            # text (for example "<unknown>") as an HTML tag and discard it.
+            if re.search(r"</?(?:p|div|br|span|blockquote|ul|li|b|i|em|strong|a)\\b",
+                         raw_description, flags=re.IGNORECASE):
+                description = BeautifulSoup(raw_description, "html.parser").get_text("\n", strip=True).strip()
+            else:
+                description = raw_description.strip()
             if description:
                 book["description"] = description
                 book["synopsis"] = description
