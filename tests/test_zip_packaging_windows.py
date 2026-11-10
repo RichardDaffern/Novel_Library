@@ -73,11 +73,105 @@ class WindowsNovelZipTests(unittest.TestCase):
             self.run_successfully(args)
             self.assertEqual(archive_path.stat().st_size, first_size)
 
+    def test_existing_zip_skipped_regardless_of_artifact_id_or_name(self):
+        with tempfile.TemporaryDirectory(prefix="Novel Library Local ZIP ") as temp:
+            root = Path(temp)
+            destination = root / "Downloaded_Novels"
+            destination.mkdir()
+            source = root / "novel source"
+            source.mkdir()
+            self.write_book(source, "True Martial World", "true-martial-world", 2)
+            # The filename is from a different Actions run than the registry.
+            zip_path = destination / "novel-42368674563.zip"
+            self.make_zip(source, zip_path, "true-martial-world")
+            registry = root / "registry.json"
+            self.write_registry(registry, "True Martial World", "true-martial-world", 98765432101)
+            args = [
+                "powershell.exe", "-NoLogo", "-NoProfile", "-ExecutionPolicy", "Bypass",
+                "-File", str(SCRIPT), "-RegistryFile", str(registry),
+                "-Destination", str(destination),
+            ]
+            result = self.run_successfully(args)
+            self.assertIn("Already downloaded locally; skipping", result.stdout)
+            self.assertIn("already local=1", result.stdout)
+            self.assertEqual([f.name for f in destination.glob("*.zip")], [zip_path.name])
+            self.assertFalse((destination / "novel-98765432101.zip").exists())
+
+    def test_existing_zip_in_alternate_local_directory_is_skipped(self):
+        with tempfile.TemporaryDirectory(prefix="Novel Library External ZIP ") as temp:
+            root = Path(temp)
+            destination = root / "Downloaded_Novels"
+            existing_dir = root / "Uploader Novels"
+            existing_dir.mkdir()
+            source = root / "novel source"
+            source.mkdir()
+            self.write_book(source, "True Martial World", "true-martial-world", 2)
+            # The local copy need not use the standard novel-ID filename.
+            self.make_zip(source, existing_dir / "existing-book-copy.zip", "true-martial-world")
+            registry = root / "registry.json"
+            self.write_registry(registry, "True Martial World", "true-martial-world", 98765432101)
+            args = [
+                "powershell.exe", "-NoLogo", "-NoProfile", "-ExecutionPolicy", "Bypass",
+                "-File", str(SCRIPT), "-RegistryFile", str(registry),
+                "-Destination", str(destination),
+                "-ExistingZipDirectory", str(existing_dir),
+            ]
+            result = self.run_successfully(args)
+            self.assertIn("Already downloaded locally; skipping", result.stdout)
+            self.assertIn("already local=1", result.stdout)
+            self.assertFalse(list(destination.glob("*.zip")))
+            self.assertTrue((existing_dir / "existing-book-copy.zip").exists())
+
+    def test_corrupt_local_zip_is_not_treated_as_complete(self):
+        with tempfile.TemporaryDirectory(prefix="Novel Library Invalid ZIP ") as temp:
+            root = Path(temp)
+            destination = root / "Downloaded_Novels"
+            destination.mkdir()
+            invalid_zip = destination / "novel-98765432101.zip"
+            invalid_zip.write_bytes(b"not a zip archive")
+            registry = root / "registry.json"
+            self.write_registry(registry, "True Martial World", "true-martial-world", 98765432101)
+            args = [
+                "powershell.exe", "-NoLogo", "-NoProfile", "-ExecutionPolicy", "Bypass",
+                "-File", str(SCRIPT), "-RegistryFile", str(registry),
+                "-Destination", str(destination), "-RepackOnly",
+            ]
+            result = subprocess.run(
+                args, cwd=ROOT, capture_output=True, text=True, errors="replace", timeout=180
+            )
+            self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+            self.assertIn("failed/unavailable=1", result.stdout)
+            self.assertTrue(invalid_zip.exists(), "An invalid local ZIP must not be silently deleted")
+
+    @staticmethod
+    def make_zip(source, target, slug):
+        with zipfile.ZipFile(target, "w", compression=zipfile.ZIP_DEFLATED) as out:
+            for item in source.iterdir():
+                if item.is_file():
+                    out.write(item, f"{slug}/{item.name}")
+
+    @staticmethod
+    def write_registry(path, title, slug, artifact_id):
+        path.write_text(json.dumps({
+            "version": 1,
+            "novels": [{
+                "title": title,
+                "url": f"https://novelfull.com/{slug}.html",
+                "downloads": [{
+                    "range": "all", "status": "complete",
+                    "artifact_id": artifact_id, "run_id": 123456,
+                    "completed_at_utc": "2026-11-07T21:53:01Z",
+                    "expires_at_utc": "2030-11-14T21:53:01Z"
+                }]
+            }]
+        }), encoding="utf-8")
+
     def run_successfully(self, command):
         result = subprocess.run(
             command, cwd=ROOT, capture_output=True, text=True, errors="replace", timeout=180,
         )
         self.assertEqual(result.returncode, 0, result.stdout + "\n" + result.stderr)
+        return result
 
     @staticmethod
     def write_book(folder, title, slug, count):
