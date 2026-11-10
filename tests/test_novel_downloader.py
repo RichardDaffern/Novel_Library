@@ -1,4 +1,5 @@
 import json
+from html import escape
 from pathlib import Path
 import tempfile
 import unittest
@@ -10,7 +11,7 @@ from fff_progress_runner import _checkpoint_chapter, progress_reporter
 
 
 class NovelDownloaderTests(unittest.TestCase):
-    def make_epub(self, root: Path, chapter_titles=None):
+    def make_epub(self, root: Path, chapter_titles=None, description=""):
         if chapter_titles is None:
             chapter_titles = ["Prologue", "Chapter 1: Return", "Chapter 2: A Journey"]
         epub = root / "fixture.epub"
@@ -20,7 +21,9 @@ class NovelDownloaderTests(unittest.TestCase):
         package = (f'<package xmlns="http://www.idpf.org/2007/opf">'
                    f'<metadata xmlns:dc="http://purl.org/dc/elements/1.1/">'
                    f'<dc:title>Example Novel</dc:title><dc:creator>Example Author</dc:creator>'
-                   f'<dc:language>en</dc:language></metadata>'
+                   f'<dc:language>en</dc:language>'
+                   + (f'<dc:description>{escape(description)}</dc:description>' if description else '') +
+                   '</metadata>'
                    f'<manifest><item id="cover" href="title.xhtml" media-type="application/xhtml+xml" />{"".join(items)}</manifest>'
                    f'<spine><itemref idref="cover" />{"".join(spine)}</spine></package>')
         with zipfile.ZipFile(epub, "w") as archive:
@@ -41,6 +44,29 @@ class NovelDownloaderTests(unittest.TestCase):
             self.assertEqual(names, ["chapter_0000_prologue.txt", "chapter_0001.txt", "chapter_0002.txt"])
             self.assertIn("Paragraph 1.\n\nMore text here.", (root / "out/chapter_0001.txt").read_text())
             self.assertNotIn("Not a chapter", (root / "out/chapter_0001.txt").read_text())
+
+    def test_source_epub_synopsis_is_preserved_in_exported_json(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            epub = self.make_epub(
+                root, description="<p>A clever villain with a choice system.</p>"
+                                  "<p>He challenges the original hero &amp; changes his fate.</p>"
+            )
+            metadata = export_epub(epub, root / "out", "https://example.org/book")
+            expected = ("A clever villain with a choice system.\n"
+                        "He challenges the original hero & changes his fate.")
+            self.assertEqual(metadata["description"], expected)
+            self.assertEqual(metadata["synopsis"], expected)
+            saved = json.loads((root / "out" / "metadata.json").read_text(encoding="utf-8"))
+            self.assertEqual(saved["description"], expected)
+            self.assertEqual(saved["chapter_count"], 3)
+
+    def test_epub_without_description_keeps_metadata_backwards_compatible(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            metadata = export_epub(self.make_epub(root), root / "out")
+            self.assertNotIn("description", metadata)
+            self.assertNotIn("synopsis", metadata)
 
     def test_duplicate_titles_cannot_overwrite(self):
         with tempfile.TemporaryDirectory() as temp:
