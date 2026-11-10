@@ -77,6 +77,40 @@ function Test-NovelZip([string]$path, [string]$novelUrl) {
         return $true
     } catch { return $false } finally { if ($archive) { $archive.Dispose() } }
 }
+function Get-ExistingNovelZipIndex([string[]]$directories) {
+    # Check ZIPs only once. Identity comes from metadata.json, not the name.
+    $index = @{}
+    $visited = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+    foreach ($directory in $directories) {
+        if ([string]::IsNullOrWhiteSpace($directory) -or
+            -not (Test-Path -LiteralPath $directory -PathType Container)) { continue }
+        foreach ($file in @(Get-ChildItem -LiteralPath $directory -File -Filter '*.zip' | Sort-Object Name)) {
+            if (-not $visited.Add($file.FullName)) { continue }
+            $archive = $null
+            try {
+                $archive = [System.IO.Compression.ZipFile]::OpenRead($file.FullName)
+                $metadata = @($archive.Entries | Where-Object { $_.FullName.EndsWith('/metadata.json') -and ($_.FullName.Split('/').Count -eq 2) })
+                if ($metadata.Count -ne 1) { continue }
+                $reader = [System.IO.StreamReader]::new($metadata[0].Open())
+                try { $details = $reader.ReadToEnd() | ConvertFrom-Json }
+                finally { $reader.Dispose() }
+                $sourceUrl = [string]$details.source_url
+                $key = Get-NovelKey $sourceUrl
+                $archive.Dispose()
+                $archive = $null
+                if ($key -and -not $index.ContainsKey($key) -and (Test-NovelZip $file.FullName $sourceUrl)) {
+                    $index[$key] = $file.FullName
+                }
+            } catch {
+                Write-Warning "Cannot inspect local ZIP '$($file.FullName)': $($_.Exception.Message)"
+            } finally {
+                if ($archive) { $archive.Dispose() }
+            }
+        }
+    }
+    return $index
+}
+
 function New-NovelZip([string]$sourceDirectory, [string]$novelUrl, [string]$zipPath) {
     $book = Get-ValidBook $sourceDirectory $novelUrl
     if (Test-Path -LiteralPath $zipPath) { throw "Refusing to overwrite an existing ZIP: $zipPath" }

@@ -10,7 +10,8 @@ param(
     [switch]$CheckSetup,
     [switch]$RepackOnly,
     [switch]$KeepOriginalFolders,
-    [string]$RegistryFile = ''
+    [string]$RegistryFile = '',
+    [string]$ExistingZipDirectory = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -40,58 +41,61 @@ try {
         Write-Host "Startup self-check passed. Destination: $Destination"
         return
     }
-if (-not $RepackOnly) {
-if (-not (Get-Command gh -ErrorAction SilentlyContinue)) {
-    throw "GitHub CLI (gh) is not installed or not on PATH. Run winget install --id GitHub.cli --exact and open a new terminal."
-}
-if ($BrowserLogin) {
-    Write-Host "Starting GitHub browser sign-in. Follow the one-time code shown here." -ForegroundColor Cyan
-    & gh auth login --web --clipboard --skip-ssh-key
-    if ($LASTEXITCODE -ne 0) { throw "GitHub browser sign-in was cancelled or unsuccessful." }
-}
-
-# Windows PowerShell 5.1 can treat native stderr as a terminating error.
-# Check login without that behaviour so the browser prompt remains reachable.
-$previousPreference = $ErrorActionPreference
-$loginValid = $false
-try {
-    $ErrorActionPreference = 'Continue'
-    & gh auth status *> $null
-    $loginValid = ($LASTEXITCODE -eq 0)
-} finally {
-    $ErrorActionPreference = $previousPreference
-}
-if (-not $loginValid) {
-    Write-Host "No working GitHub CLI authentication was detected." -ForegroundColor Yellow
-    $reply = Read-Host "Open browser-based GitHub sign-in now? [Y/n]"
-    if ([string]::IsNullOrWhiteSpace($reply) -or $reply -match '^(?i:y|yes)$') {
-        Write-Host 'GitHub CLI will display a one-time code and open your browser.'
+# Authenticate only if a new artifact is actually required.
+$script:GitHubAuthenticationReady = $false
+function Confirm-GitHubAuthentication {
+    if ($script:GitHubAuthenticationReady) { return }
+    if (-not (Get-Command gh -ErrorAction SilentlyContinue)) {
+        throw "GitHub CLI (gh) is not installed or not on PATH. Run winget install --id GitHub.cli --exact and open a new terminal."
+    }
+    if ($BrowserLogin) {
+        Write-Host "Starting GitHub browser sign-in. Follow the one-time code shown here." -ForegroundColor Cyan
         & gh auth login --web --clipboard --skip-ssh-key
-        if ($LASTEXITCODE -ne 0) { throw "GitHub browser sign-in failed or was cancelled." }
-        $previousPreference = $ErrorActionPreference
-        try {
-            $ErrorActionPreference = 'Continue'
-            & gh auth status *> $null
-            $loginValid = ($LASTEXITCODE -eq 0)
-        } finally {
-            $ErrorActionPreference = $previousPreference
+        if ($LASTEXITCODE -ne 0) { throw "GitHub browser sign-in was cancelled or unsuccessful." }
+    }
+    
+    # Windows PowerShell 5.1 can treat native stderr as a terminating error.
+    # Check login without that behaviour so the browser prompt remains reachable.
+    $previousPreference = $ErrorActionPreference
+    $loginValid = $false
+    try {
+        $ErrorActionPreference = 'Continue'
+        & gh auth status *> $null
+        $loginValid = ($LASTEXITCODE -eq 0)
+    } finally {
+        $ErrorActionPreference = $previousPreference
+    }
+    if (-not $loginValid) {
+        Write-Host "No working GitHub CLI authentication was detected." -ForegroundColor Yellow
+        $reply = Read-Host "Open browser-based GitHub sign-in now? [Y/n]"
+        if ([string]::IsNullOrWhiteSpace($reply) -or $reply -match '^(?i:y|yes)$') {
+            Write-Host 'GitHub CLI will display a one-time code and open your browser.'
+            & gh auth login --web --clipboard --skip-ssh-key
+            if ($LASTEXITCODE -ne 0) { throw "GitHub browser sign-in failed or was cancelled." }
+            $previousPreference = $ErrorActionPreference
+            try {
+                $ErrorActionPreference = 'Continue'
+                & gh auth status *> $null
+                $loginValid = ($LASTEXITCODE -eq 0)
+            } finally {
+                $ErrorActionPreference = $previousPreference
+            }
+            if (-not $loginValid) { throw "GitHub CLI still reports no working login." }
+        } else {
+            throw "No GitHub CLI login. Run 'gh auth login --web --clipboard' in a terminal to sign in."
         }
-        if (-not $loginValid) { throw "GitHub CLI still reports no working login." }
-    } else {
-        throw "No GitHub CLI login. Run 'gh auth login --web --clipboard' in a terminal to sign in."
     }
-}
-
-# An account with read access (such as AdityaSreevatsaK) is sufficient.
-try {
-    $activeUser = & gh api user --jq .login 2>$null
-    if ($LASTEXITCODE -eq 0 -and $activeUser) {
-        Write-Host "Using GitHub account: $activeUser" -ForegroundColor Green
+    
+    # An account with read access (such as AdityaSreevatsaK) is sufficient.
+    try {
+        $activeUser = & gh api user --jq .login 2>$null
+        if ($LASTEXITCODE -eq 0 -and $activeUser) {
+            Write-Host "Using GitHub account: $activeUser" -ForegroundColor Green
+        }
+    } catch {
+        Write-Warning 'Could not identify active GitHub account; proceeding with existing credentials.'
     }
-} catch {
-    Write-Warning 'Could not identify active GitHub account; proceeding with existing credentials.'
-}
-
+    $script:GitHubAuthenticationReady = $true
 }
 
 # Fetch the current registry; its entries are links, not the files themselves.
@@ -130,6 +134,16 @@ $books = @($grouped.Values | Where-Object { $_.Candidates.Count -gt 0 } | Sort-O
 if ($Limit -gt 0) { $books = @($books | Select-Object -First $Limit) }
 
 New-Item -ItemType Directory -Path $Destination -Force | Out-Null
+$lookupDirectories = @($Destination)
+if (-not [string]::IsNullOrWhiteSpace($ExistingZipDirectory)) {
+    if (-not (Test-Path -LiteralPath $ExistingZipDirectory -PathType Container)) {
+        throw "Existing ZIP directory does not exist: $ExistingZipDirectory"
+    }
+    $lookupDirectories += $ExistingZipDirectory
+}
+Write-Host "Checking local ZIP archives before downloading..." -ForegroundColor Cyan
+$localZips = Get-ExistingNovelZipIndex $lookupDirectories
+Write-Host "Found $($localZips.Count) verified local ZIP(s)."
 Write-Host "Found $($books.Count) unique novels with complete archives."
 Write-Host "Destination: $Destination"
 
@@ -151,6 +165,17 @@ function Get-ArtifactInfo([long]$Id) {
 # downloading again. Keep the original extraction as a reversible backup.
 $backupRoot = $Destination + '_Originals'
 $stagingRoot = $Destination + '_Staging'
+function Get-FreeZipDestination([long]$artifactId) {
+    $path = Join-Path $Destination ("novel-$artifactId.zip")
+    if (-not (Test-Path -LiteralPath $path)) { return $path }
+    # Keep any existing archive untouched, even if it is corrupt.
+    $suffix = 1
+    do {
+        $path = Join-Path $Destination ("novel-$artifactId-recovered-$suffix.zip")
+        $suffix++
+    } while (Test-Path -LiteralPath $path)
+    return $path
+}
 function Preserve-Legacy([string]$path) {
     if ($KeepOriginalFolders -or -not (Test-Path -LiteralPath $path -PathType Container)) { return }
     New-Item -ItemType Directory -Path $backupRoot -Force | Out-Null
@@ -184,19 +209,13 @@ foreach ($book in $books) {
         Expression = { [datetime]$_.completed_at_utc }; Descending = $true
     })
 
-    # A verified ZIP can be reused regardless of which run produced it.
-    foreach ($candidate in $candidates) {
-        $zipPath = Join-Path $Destination ("novel-$($candidate.artifact_id).zip")
-        if (Test-NovelZip $zipPath $book.Url) {
-            Write-Host "  Already archived: $([System.IO.Path]::GetFileName($zipPath))"
-            Preserve-Legacy $legacy
-            $skipped++; $completed = $true; break
-        }
-        if (Test-Path -LiteralPath $zipPath) {
-            Write-Warning "Existing ZIP is invalid or belongs to another novel: $zipPath"
-        }
+    # Reuse locally valid ZIPs regardless of their filename or artifact ID.
+    $novelKey = Get-NovelKey $book.Url
+    if ($novelKey -and $localZips.ContainsKey($novelKey)) {
+        Write-Host "  Already downloaded locally; skipping: $($localZips[$novelKey])" -ForegroundColor Green
+        $skipped++
+        continue
     }
-    if ($completed) { continue }
 
     # Convert an old download from the previous folder-based version.
     if (Test-Path -LiteralPath $legacy -PathType Container) {
@@ -209,9 +228,10 @@ foreach ($book in $books) {
                 if ($knownIds -notcontains $artifactId) {
                     throw "Old folder receipt artifact $artifactId is not listed for this book."
                 }
-                $zipPath = Join-Path $Destination ("novel-$artifactId.zip")
+                $zipPath = Get-FreeZipDestination $artifactId
                 New-NovelZip $legacy $book.Url $zipPath
                 Preserve-Legacy $legacy
+                $localZips[$novelKey] = $zipPath
                 $success++; $completed = $true
             } catch {
                 Write-Warning "Existing download could not be repacked: $($_.Exception.Message)"
@@ -228,8 +248,8 @@ foreach ($book in $books) {
     foreach ($candidate in $candidates) {
         if ($candidate.expires_at_utc -and [datetime]$candidate.expires_at_utc -le [datetime]::UtcNow) { continue }
         $artifactId = [long]$candidate.artifact_id
-        $zipPath = Join-Path $Destination ("novel-$artifactId.zip")
-        if (Test-Path -LiteralPath $zipPath) { continue }
+        $zipPath = Get-FreeZipDestination $artifactId
+        Confirm-GitHubAuthentication
         $artifact = Get-ArtifactInfo $artifactId
         if ($null -eq $artifact -or $artifact.expired -or
             [string]::IsNullOrWhiteSpace([string]$artifact.name) -or
@@ -249,6 +269,7 @@ foreach ($book in $books) {
                 if ($LASTEXITCODE -ne 0) { throw "GitHub CLI returned exit code $LASTEXITCODE" }
                 New-NovelZip $stage $book.Url $zipPath
                 Remove-Item -LiteralPath $stage -Recurse -Force
+                $localZips[$novelKey] = $zipPath
                 $success++; $completed = $true; break
             } catch {
                 Write-Warning "Attempt $attempt failed: $($_.Exception.Message)"
@@ -269,7 +290,7 @@ if ($failed.Count) {
 } elseif (Test-Path -LiteralPath $failureLog) {
     Remove-Item -LiteralPath $failureLog -Force
 }
-Write-Host "`nFinished: ZIPs created=$success, already archived=$skipped, failed/unavailable=$($failed.Count)." -ForegroundColor Cyan
+Write-Host "`nFinished: ZIPs created=$success, already local=$skipped, failed/unavailable=$($failed.Count)." -ForegroundColor Cyan
 if ($failed.Count) {
     Write-Warning "See $failureLog ; rerun this launcher to retry."
     exit 2
