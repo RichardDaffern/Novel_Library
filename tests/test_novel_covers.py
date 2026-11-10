@@ -169,6 +169,16 @@ class CoverPipelineTests(unittest.TestCase):
             self.assertEqual(cover[0], image_bytes())
             self.assertEqual(len(epub_chapters(book / "source.epub")[1]), 4)
 
+    def test_missing_declared_cover_cannot_be_used_as_verified_batch(self):
+        from tools.chunked_download import validate_piece
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            key = identity(NOVELFULL)
+            folder = piece(root, NOVELFULL, key, 1, 2, with_cover=True)
+            (folder / "book" / "cover.jpg").unlink()
+            with self.assertRaisesRegex(ValueError, "Missing or oversized"):
+                validate_piece(folder, NOVELFULL, key, 1, 2)
+
     def test_no_cover_is_allowed_and_not_invented(self):
         plan = chapter_plan(NOVELFULL, 2, "1-2", chunk_size=2)
         with TemporaryDirectory() as tmp:
