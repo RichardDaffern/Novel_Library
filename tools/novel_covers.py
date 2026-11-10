@@ -114,6 +114,9 @@ def _image_candidates(html: str, book_url: str) -> list[str]:
     # Prefer book-specific cover tags. Site layouts may change, so use a
     # conservative fallback to OpenGraph metadata rather than the first image.
     selectors = (
+        # FanFicFare's live NovelFull adapter uses div.book > img;
+        # the earlier .book-img selector missed all 89 indexed books.
+        "div.book img",
         ".book-img img", ".book-cover img", ".book-image img",
         ".novel-cover img", ".bookpic img", ".book-pic img",
         ".detail-cover img", ".details .cover img",
@@ -130,7 +133,8 @@ def _image_candidates(html: str, book_url: str) -> list[str]:
             candidates.append(tag["content"])
     # If no structural cover selector matched, use a matching-alt image.
     if not candidates:
-        title = soup.find("h1")
+        # NovelFull book titles are h3.title, not h1.
+        title = soup.select_one("h3.title, h1, h2.title")
         text = title.get_text(" ", strip=True).casefold() if title else ""
         for img in soup.select("img[alt]"):
             alt = img.get("alt", "").strip().casefold()

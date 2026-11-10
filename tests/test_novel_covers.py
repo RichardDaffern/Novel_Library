@@ -104,6 +104,44 @@ class CoverPipelineTests(unittest.TestCase):
             ["https://images.example.com/book.jpg"],
         )
 
+    def test_actual_novelfull_book_container_matches_fanficfare_adapter(self):
+        # FanFicFare adapter_novelfull.py reads: soup.find("div", class_="book").find("img")
+        html = (
+            '<html><head><title>Read Martial World Online</title></head>'
+            '<body><h3 class="title">Martial World</h3>'
+            '<div class="book"><img alt="Martial World" '
+            'src="/uploads/thumbs/martial-world-1fc87929f8-2239c49aee6b961904acf173b7e4602a.png"></div>'
+            '<img alt="Site logo" src="/images/logo.svg">'
+            '</body></html>'
+        )
+        expected = (
+            "https://novelfull.com/uploads/thumbs/"
+            "martial-world-1fc87929f8-2239c49aee6b961904acf173b7e4602a.png"
+        )
+        self.assertEqual(_image_candidates(html, NOVELFULL), [expected])
+        requests = []
+        def fetch(url, referer):
+            requests.append((url, referer))
+            return image_bytes("PNG")
+        actual, extension, source = download_site_cover(
+            NOVELFULL, html=html, image_fetcher=fetch,
+        )
+        self.assertEqual(extension, ".png")
+        self.assertEqual(source, expected)
+        self.assertEqual(requests, [(expected, NOVELFULL)])
+        self.assertEqual(actual, image_bytes("PNG"))
+
+    def test_h3_title_matching_alt_is_fallback_when_cover_has_no_book_container(self):
+        html = (
+            '<h3 class="title">Martial World</h3>'
+            '<img alt="Martial World" src="/uploads/thumbs/martial-world.png">'
+            '<img alt="NovelFull" src="/images/logo.png">'
+        )
+        self.assertEqual(
+            _image_candidates(html, NOVELFULL),
+            ["https://novelfull.com/uploads/thumbs/martial-world.png"],
+        )
+
     def test_public_cover_download_only_fetches_book_page_and_image(self):
         requests = []
         html = '<div class="book-img"><img src="/covers/martial-world.png"/></div>'
