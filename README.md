@@ -28,9 +28,11 @@ python -u novel_downloader.py "https://example.org/novel" --confirm-rights --cha
 
 Chapter ranges are one-based, inclusive positions in the site's chapter index. The script prints a chapter-completion percentage and writes a TXT file into the chapters_in_progress directory as soon as each chapter finishes. After successful EPUB creation, it exports the final chapters, manifest and metadata and removes temporary checkpoints.
 
-## GitHub Actions: Download novel
+## GitHub Actions: NovelFull Download
 
-In **Actions > Download novel > Run workflow**, enter:
+Both download workflows use FanFicFare and are currently used for NovelFull URLs; other FanFicFare-supported sources may also work. The separate `CI` workflow runs automatic regression checks and is not a downloadable-novel action.
+
+In **Actions > NovelFull Download > Run workflow**, enter:
 
 - **Novel URL**: the source URL
 - **Chapter range**: optional, e.g. 1-30; blank requests the whole novel
@@ -53,9 +55,9 @@ For automatic PR creation and merging, the repository owner must enable **Settin
 
 **Important:** Your repository is currently public. GitHub Actions artifacts may be accessible to other users of public repositories. Making a repository private limits exposure but does not grant permission to redistribute copyrighted content.
 
-## GitHub Actions: Bulk Download Novels
+## GitHub Actions: NovelFull Bulk Download
 
-Use **Actions > Bulk Download Novels > Run workflow** and enter up to 10 distinct authorised novel URLs separated by commas, spaces or newlines. You may specify one inclusive chapter range for all novels and use Force to bypass the existing-archive check.
+Use **Actions > NovelFull Bulk Download > Run workflow** and enter up to 10 distinct authorised novel URLs separated by commas, spaces or newlines. You may specify one inclusive chapter range for all novels and use Force to bypass the existing-archive check.
 
 The bulk workflow checks the downloaded-novels registry once, removes duplicate URLs and **calls the same automatic chunked downloader for each outstanding novel**. Up to **three distinct novels run concurrently**. Each novel independently scales from **one to six chapter jobs** based on its selected chapter count. This can mean up to **18 chapter download jobs** within one bulk run, subject to GitHub runner availability and source-site limits. Previously recorded completed novels are still skipped when their artifacts are available. A failed novel does not prevent later novels from running.
 
