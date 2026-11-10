@@ -53,7 +53,7 @@ class NovelDownloaderTests(unittest.TestCase):
                                   "<p>He challenges the original hero &amp; changes his fate.</p>"
             )
             metadata = export_epub(epub, root / "out", "https://example.org/book")
-            expected = ("A clever villain with a choice system.\\n"
+            expected = ("A clever villain with a choice system.\n"
                         "He challenges the original hero & changes his fate.")
             self.assertEqual(metadata["description"], expected)
             self.assertEqual(metadata["synopsis"], expected)
