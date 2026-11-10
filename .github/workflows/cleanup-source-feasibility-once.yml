@@ -1,0 +1,27 @@
+name: Temporary source-feasibility branch cleanup
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/cleanup-source-feasibility-once.yml
+permissions:
+  contents: write
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete only the verified merged feature branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          name='feat/site-bulk-menus-and-source-feasibility'
+          expected='c74b0b7c2d696aa9fbc45262d040ed8edac47ef0'
+          actual=$(gh api "repos/${REPOSITORY}/git/ref/heads/${name}" --jq '.object.sha')
+          if [[ "$actual" != "$expected" ]]; then
+            echo "::error::Branch changed since merge; preserving it"
+            exit 1
+          fi
+          gh api -X DELETE "repos/${REPOSITORY}/git/refs/heads/${name}"
+          echo "Deleted merged branch ${name}"
