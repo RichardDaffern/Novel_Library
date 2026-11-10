@@ -193,6 +193,7 @@ def export_epub(epub_path: Path, output_dir: Path, source_url: str | None = None
         "created_at_utc": datetime.now(timezone.utc).isoformat(),
         "format": "epub", "chapter_files": "UTF-8 TXT",
         "synopsis_pipeline_version": 2,  # EPUB dc:description is preserved when present
+        "cover_pipeline_version": 1,  # EPUB cover image extraction supported
     }
     (output_dir / "metadata.json").write_text(json.dumps(metadata, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     (output_dir / "chapters.json").write_text(json.dumps(results, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
