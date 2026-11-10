@@ -210,13 +210,23 @@ python -m tools.repair_synopsis --directory "Downloaded_Novels"
 python -m tools.repair_synopsis --directory "Downloaded_Novels" --apply
 ~~~
 
-The default is a **dry run**. `--apply` writes corrected copies into
-`Downloaded_Novels/Synopsis_Repaired/`. It does **not** overwrite source
-ZIPs or redownload chapter text. If you already have a custom synopsis or
-the public source is unavailable, pass `--description-file "summary.txt"`
-with a single `--zip` and `--apply`. The importer in your reading app
-may require you to replace or reimport the previously imported novel:
-repairing your local ZIP does not retroactively change hosted/library data.
+The default is a **dry run**. With `--apply`, the repair script
+builds a replacement ZIP in the **same directory**, verifies all ZIP/EPUB
+integrity checks, confirms every chapter and manifest remains byte-identical,
+flushes the temporary file and **atomically replaces the original ZIP**.
+On validation, permission or network failure, the original ZIP remains
+unchanged; temporary files are cleaned up. It does **not** download chapters
+again or create a duplicate `Synopsis_Repaired` directory.
+
+This is a safe replacement, not a permanent backup: if you want an undo
+copy, keep one separately. The script still supports an explicit
+`--output-dir "some-folder"` to create repaired copies instead.
+
+If you already have a custom synopsis or the public source is unavailable,
+pass `--description-file "summary.txt"` with a single `--zip` and `--apply`.
+The importer in your reading app may require you to replace or reimport
+the previously imported novel: repairing your local ZIP does not
+retroactively change hosted/library data.
 
 Only archive and update material you are authorised to keep. Source
 descriptions may be unavailable or blocked; failed books are reported and
