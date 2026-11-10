@@ -89,6 +89,61 @@ class ExperimentalSourcesTests(unittest.TestCase):
             with self.subTest(sample=sample), self.assertRaises(SourceProbeError):
                 probe_saved_chapter(sample)
 
+    def test_wtrlab_modern_book_and_chapter_links_offline(self):
+        url = "https://wtr-lab.com/en/novel/6965/myriad-paths"
+        self.assertEqual(
+            validate_book_url(url), ("WTRLab", url)
+        )
+        self.assertEqual(
+            validate_book_url("https://www.wtr-lab.com/en/novel/6965/myriad-paths/"),
+            ("WTRLab", url)
+        )
+        html = (
+            '<h1>Myriad Paths</h1>'
+            '<div itemprop="author">Original Author</div>'
+            '<div class="desc-text">A cultivation adventure.</div>'
+            '<p>620 Chapters</p>'
+        )
+        info = parse_book_info(html, url)
+        self.assertEqual(info["website"], "WTRLab")
+        self.assertEqual(info["chapter_count_reported"], 620)
+        toc = (
+            '<a href="/en/novel/6965/myriad-paths/chapter-2">Chapter Two</a>'
+            '<a href="/en/novel/6965/myriad-paths/chapter-1">Chapter One</a>'
+            '<a href="/en/novel/6966/other/chapter-1">Other Book</a>'
+            '<a href="/en/novel/6965/myriad-paths/chapter-3?unlock=1">Locked</a>'
+        )
+        chapters = parse_chapter_links(toc, url)
+        self.assertEqual([c["position"] for c in chapters], [1, 2])
+        with self.assertRaises(SourceProbeError):
+            validate_book_url("https://wtr-lab.com/en/novel/6965/myriad-paths/chapter-1")
+        for locked in ("Unlock Chapter", "This chapter requires tickets"):
+            with self.subTest(locked=locked), self.assertRaises(SourceProbeError):
+                probe_saved_chapter(
+                    '<div id="chapter-content"><p>' + locked + '</p></div>'
+                )
+
+    def test_royalroad_chapter_ids_are_not_position_numbers(self):
+        url = "https://www.royalroad.com/fiction/21220/mother-of-learning"
+        label, canonical = validate_book_url(url)
+        self.assertEqual(label, "RoyalRoad")
+        self.assertEqual(canonical, "https://royalroad.com/fiction/21220/mother-of-learning")
+        toc = (
+            '<a href="/fiction/21220/mother-of-learning/chapter/301778/1-good-morning-brother">'
+            '1. Good Morning, Brother</a>'
+            '<a href="/fiction/21220/mother-of-learning/chapter/299000/prologue">Prologue</a>'
+            '<a href="/fiction/21220/mother-of-learning/chapter/301778/1-good-morning-brother">'
+            'Duplicate</a>'
+            '<a href="/fiction/99999/wrong/chapter/999999/other">Other book</a>'
+        )
+        chapters = parse_chapter_links(toc, url)
+        self.assertEqual(len(chapters), 2)
+        self.assertEqual([c["position"] for c in chapters], [1, 2])
+        self.assertEqual([c["chapter_id"] for c in chapters], ["301778", "299000"])
+        self.assertEqual(chapters[0]["title"], "1. Good Morning, Brother")
+        with self.assertRaises(SourceProbeError):
+            validate_book_url(url + "/chapter/301778/1-good-morning-brother")
+
     def test_local_cli_no_network_and_no_chapter_text_in_report(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
