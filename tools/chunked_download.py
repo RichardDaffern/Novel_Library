@@ -168,6 +168,19 @@ def _prior_artifacts(name: str, repository: str) -> list[dict]:
         return []
 
 
+def cache_has_synopsis_support(metadata: dict, url: str) -> bool:
+    """Never reuse pre-fix NovelFull batches that could silently lose a synopsis.
+
+    This is a pipeline capability marker, not a claim that every source
+    provides a description. Other website adapters retain legacy cache
+    compatibility.
+    """
+    host = (urlsplit(url).hostname or "").lower().removeprefix("www.")
+    if host != "novelfull.com":
+        return True
+    return metadata.get("synopsis_pipeline_version") == 2
+
+
 def reuse_complete_piece(folder: Path, url: str, key: str, first: int, last: int) -> bool:
     name = f"chapter-batch-{key}-{first:05d}-{last:05d}"
     for artifact in _prior_artifacts(name, os.environ.get("GITHUB_REPOSITORY", ""))[:5]:
@@ -181,7 +194,9 @@ def reuse_complete_piece(folder: Path, url: str, key: str, first: int, last: int
                     ["gh", "run", "download", str(run), "-n", name, "-D", str(candidate)],
                     check=True, capture_output=True, text=True, timeout=120,
                 )
-                validate_piece(candidate, url, key, first, last)
+                verified = validate_piece(candidate, url, key, first, last)
+                if not cache_has_synopsis_support(verified["metadata"], url):
+                    raise ValueError("Legacy NovelFull batch lacks synopsis preservation; download afresh")
                 shutil.copytree(candidate, folder, dirs_exist_ok=True)
                 print(f"REUSED completed chapters {first}-{last} from run {run}", flush=True)
                 return True
@@ -335,6 +350,12 @@ def assemble(plan: dict, chunks_dir: Path, output_dir: Path) -> Path:
          if isinstance(value, str) and value.strip()),
         "",
     )
+    if not description:
+        print(
+            "WARNING: No source synopsis is available in the downloaded "
+            "chapter batches; final EPUB cannot contain a description.",
+            flush=True,
+        )
     _epub(book, merged, title, author, language, url, description=description)
     epub_metadata, from_epub = epub_chapters(book / "source.epub")
     if len(from_epub) != len(merged):
