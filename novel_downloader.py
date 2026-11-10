@@ -79,6 +79,14 @@ def epub_chapters(epub_path: Path) -> tuple[dict, list[dict]]:
             "author": _first_text(package, "creator"),
             "language": _first_text(package, "language"),
         }
+        # FanFicFare and other EPUB producers often store the synopsis as
+        # HTML inside dc:description. Keep plain, readable text in metadata.
+        raw_description = _first_text(package, "description")
+        if raw_description:
+            description = BeautifulSoup(raw_description, "html.parser").get_text("\n", strip=True).strip()
+            if description:
+                book["description"] = description
+                book["synopsis"] = description
         manifest = {}
         spine = []
         for element in package.iter():
