@@ -1,5 +1,5 @@
 # Helper: store exactly one completed novel as a reader-compatible ZIP.
-# ZIP layout: <source-slug>/chapter_0001.txt, chapters.json, metadata.json, source.epub.
+# ZIP layout: <source-slug>/chapter_0001.txt, chapters.json, metadata.json, source.epub, optional cover.jpg/png.
 Add-Type -AssemblyName System.IO.Compression
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 
@@ -38,7 +38,17 @@ function Get-ValidBook([string]$sourceDirectory, [string]$novelUrl) {
                 if (-not (Test-Path -LiteralPath $path -PathType Leaf) -or (Get-Item -LiteralPath $path).Length -le 0) { $valid = $false; break }
                 $chapters.Add($path)
             }
-            if ($valid) { $foundBooks += [pscustomobject]@{ Directory = $dir; Chapters = $chapters.ToArray(); Count = $chapterList.Count } }
+            $coverPath = $null
+            if ($valid -and $meta.cover_image) {
+                $coverName = [string]$meta.cover_image
+                if ($coverName -cnotin @('cover.jpg', 'cover.png')) { $valid = $false }
+                else {
+                    $coverPath = Join-Path $dir $coverName
+                    if (-not (Test-Path -LiteralPath $coverPath -PathType Leaf) -or
+                        (Get-Item -LiteralPath $coverPath).Length -lt 100) { $valid = $false }
+                }
+            }
+            if ($valid) { $foundBooks += [pscustomobject]@{ Directory = $dir; Chapters = $chapters.ToArray(); Count = $chapterList.Count; Cover = $coverPath } }
             else { Write-Warning "A chapter is missing or invalid in $($dir)" }
         } catch { Write-Warning "Ignoring invalid candidate at $($dir): $($_.Exception.Message)" }
     }
@@ -67,7 +77,15 @@ function Test-NovelZip([string]$path, [string]$novelUrl) {
             foreach ($item in $parsedChapters) { $chapters.Add($item) }
         } finally { $reader.Dispose() }
         if ($chapters.Count -lt 1 -or $chapters.Count -ne [int]$meta.chapter_count) { return $false }
-        if ($archive.Entries.Count -ne ($chapters.Count + 3)) { return $false }
+        $expected = $chapters.Count + 3
+        if ($meta.cover_image) {
+            $coverName = [string]$meta.cover_image
+            if ($coverName -cnotin @('cover.jpg', 'cover.png')) { return $false }
+            $coverEntry = $archive.GetEntry($prefix + $coverName)
+            if (-not $coverEntry -or $coverEntry.Length -lt 100) { return $false }
+            $expected += 1
+        }
+        if ($archive.Entries.Count -ne $expected) { return $false }
         foreach ($chapter in $chapters) {
             $file = [string]$chapter.file
             if ($file -notmatch '^chapter_[0-9]+\.txt$') { return $false }
@@ -120,6 +138,7 @@ function New-NovelZip([string]$sourceDirectory, [string]$novelUrl, [string]$zipP
     try {
         $archive = [System.IO.Compression.ZipFile]::Open($temporary, [System.IO.Compression.ZipArchiveMode]::Create)
         $files = @($book.Chapters) + @((Join-Path $book.Directory 'chapters.json'), (Join-Path $book.Directory 'metadata.json'), (Join-Path $book.Directory 'source.epub'))
+        if ($book.Cover) { $files += @($book.Cover) }
         foreach ($file in $files) {
             $entryName = (Get-NovelSlug $novelUrl) + '/' + [System.IO.Path]::GetFileName($file)
             [void][System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile($archive, $file, $entryName, [System.IO.Compression.CompressionLevel]::Optimal)

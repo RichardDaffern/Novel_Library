@@ -138,6 +138,7 @@ def _validate_saved_row(book: Path, row: dict, number: int) -> bool:
 def download_range(
     url: str, first: int, last: int, output_dir: Path, *,
     confirm_rights=False, fetcher=fetch_public_html, sleeper=time.sleep,
+    image_fetcher=None,
 ) -> dict:
     if not confirm_rights:
         raise DownloadError("--confirm-rights is required before requests")
@@ -153,6 +154,20 @@ def download_range(
     name = slugify(details["title"]) + f"-chapters-{first:05d}-{last:05d}"
     book = Path(output_dir) / name
     book.mkdir(parents=True, exist_ok=True)
+    from tools.novel_covers import (
+        CoverError, download_site_cover, fetch_image, write_cover
+    )
+    cover_name = next((name for name in ("cover.jpg", "cover.png")
+                       if (book / name).is_file()), "")
+    if not cover_name:
+        try:
+            image_data, ext, _ = download_site_cover(
+                url, html=html,
+                image_fetcher=image_fetcher or fetch_image,
+            )
+            cover_name = write_cover(book, image_data, ext)
+        except CoverError as exc:
+            print(f"WARNING: FreeWebNovel cover unavailable: {exc}", flush=True)
     checkpoint = book / ".progress.json"
     prior = {}
     if checkpoint.exists():
@@ -210,7 +225,8 @@ def download_range(
     if not all(_validate_saved_row(book, row, number)
                for number, row in zip(range(first, last+1), rows)):
         raise DownloadError("Chapter checksum verification failed before EPUB assembly")
-    _epub(book, rows, details["title"], details["author"], "en", url)
+    _epub(book, rows, details["title"], details["author"], "en", url,
+          cover_path=(book / cover_name if cover_name else None))
     _, chapters = epub_chapters(book / "source.epub")
     if len(chapters) != len(rows):
         raise DownloadError("EPUB verification failed: missing chapter pages")
@@ -219,7 +235,10 @@ def download_range(
         "language": "en", "source_url": url, "chapter_count": len(rows),
         "created_at_utc": datetime.now(timezone.utc).isoformat(),
         "format": "epub", "chapter_files": "UTF-8 TXT",
+        "cover_pipeline_version": 1,
     }
+    if cover_name:
+        metadata["cover_image"] = cover_name
     _write_json(book / "chapters.json", rows)
     _write_json(book / "metadata.json", metadata)
     checkpoint.unlink(missing_ok=True)

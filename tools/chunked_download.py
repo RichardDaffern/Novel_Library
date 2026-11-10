@@ -137,6 +137,17 @@ def validate_piece(folder: Path, url: str, key: str, first: int, last: int) -> d
         raise ValueError("Chapter batch manifest and metadata counts differ")
     if not (book_dir / "source.epub").is_file():
         raise ValueError("Missing source EPUB in chapter batch")
+    cover_name = metadata.get("cover_image")
+    if cover_name:
+        if cover_name not in ("cover.jpg", "cover.png"):
+            raise ValueError("Invalid cover filename in chapter batch metadata")
+        cover_path = book_dir / cover_name
+        if not cover_path.is_file() or cover_path.stat().st_size > 8 * 1024 * 1024:
+            raise ValueError("Missing or oversized chapter-batch cover image")
+        from tools.novel_covers import validate_image
+        data, extension = validate_image(cover_path.read_bytes())
+        if extension != cover_path.suffix.lower():
+            raise ValueError("Cover file extension does not match its format")
     for row in rows:
         name = row.get("file", "")
         if not name or Path(name).name != name:
@@ -169,16 +180,17 @@ def _prior_artifacts(name: str, repository: str) -> list[dict]:
 
 
 def cache_has_synopsis_support(metadata: dict, url: str) -> bool:
-    """Never reuse pre-fix NovelFull batches that could silently lose a synopsis.
+    """Reject old supported-site chapter batches lacking metadata capabilities.
 
-    This is a pipeline capability marker, not a claim that every source
-    provides a description. Other website adapters retain legacy cache
-    compatibility.
+    Markers indicate the downloader *supports* a synopsis/cover. A source
+    novel may genuinely have neither. Other sites are left compatible.
     """
     host = (urlsplit(url).hostname or "").lower().removeprefix("www.")
-    if host != "novelfull.com":
-        return True
-    return metadata.get("synopsis_pipeline_version") == 2
+    if host == "novelfull.com" and metadata.get("synopsis_pipeline_version") != 2:
+        return False
+    if host in {"novelfull.com", "freewebnovel.com"}:
+        return metadata.get("cover_pipeline_version") == 1
+    return True
 
 
 def reuse_complete_piece(folder: Path, url: str, key: str, first: int, last: int) -> bool:
@@ -196,7 +208,7 @@ def reuse_complete_piece(folder: Path, url: str, key: str, first: int, last: int
                 )
                 verified = validate_piece(candidate, url, key, first, last)
                 if not cache_has_synopsis_support(verified["metadata"], url):
-                    raise ValueError("Legacy NovelFull batch lacks synopsis preservation; download afresh")
+                    raise ValueError("Cached batch predates synopsis/cover metadata support; download afresh")
                 shutil.copytree(candidate, folder, dirs_exist_ok=True)
                 print(f"REUSED completed chapters {first}-{last} from run {run}", flush=True)
                 return True
@@ -235,7 +247,7 @@ def fetch_piece(url: str, key: str, first: int, last: int, folder: Path,
 
 
 def _epub(book: Path, rows: list[dict], title: str, author: str, language: str, url: str,
-          description: str = "") -> None:
+          description: str = "", cover_path: Path | None = None) -> None:
     def chapter_xhtml(chapter: dict) -> str:
         content = (book / chapter["file"]).read_text(encoding="utf-8")
         lines = content.split("\n", 2)
@@ -251,6 +263,15 @@ def _epub(book: Path, rows: list[dict], title: str, author: str, language: str, 
                 f'<h3 class="fff_chapter_title">{escape(chapter["title"])}</h3>'
                 + "".join(paragraphs) + '</body></html>')
 
+    cover_name = ""
+    cover_bytes = b""
+    if cover_path is not None:
+        from tools.novel_covers import validate_image
+        cover_bytes, extension = validate_image(cover_path.read_bytes())
+        if extension != cover_path.suffix.lower():
+            raise ValueError("Cover extension does not match its image type")
+        cover_name = "cover" + extension
+
     manifest = [
         f'<item id="chap{i}" href="chap{i:06d}.xhtml" media-type="application/xhtml+xml" />'
         for i in range(1, len(rows) + 1)
@@ -265,10 +286,17 @@ def _epub(book: Path, rows: list[dict], title: str, author: str, language: str, 
         f'<dc:language>{escape(language or "en")}</dc:language>'
         + (f"<dc:description>{escape(description)}</dc:description>" if description else "") +
         f'<dc:identifier id="bookid">urn:uuid:{uuid.uuid5(uuid.NAMESPACE_URL, url)}</dc:identifier>'
+        + ('<meta name="cover" content="cover-image"/>' if cover_name else '') +
         '</metadata><manifest><item id="toc" href="toc.ncx" '
         'media-type="application/x-dtbncx+xml" />'
+        + (f'<item id="cover-image" href="{cover_name}" '
+           f'media-type="image/{"png" if cover_name.endswith(".png") else "jpeg"}" />'
+           '<item id="cover-page" href="cover.xhtml" '
+           'media-type="application/xhtml+xml" />' if cover_name else '')
         + "".join(manifest) +
-        '</manifest><spine toc="toc">' + "".join(spine) + '</spine></package>'
+        '</manifest><spine toc="toc">'
+        + ('<itemref idref="cover-page" linear="no" />' if cover_name else '')
+        + "".join(spine) + '</spine></package>'
     )
     navpoints = "".join(
         f'<navPoint id="nav{i}" playOrder="{i}">'
@@ -294,6 +322,14 @@ def _epub(book: Path, rows: list[dict], title: str, author: str, language: str, 
         z.writestr("META-INF/container.xml", container)
         z.writestr("OEBPS/content.opf", package)
         z.writestr("OEBPS/toc.ncx", ncx)
+        if cover_name:
+            cover_page = ('<?xml version="1.0" encoding="utf-8"?>'
+                          '<html xmlns="http://www.w3.org/1999/xhtml">'
+                          '<head><title>Cover</title></head><body>'
+                          f'<div><img alt="Cover" src="{cover_name}" /></div>'
+                          '</body></html>')
+            z.writestr("OEBPS/cover.xhtml", cover_page)
+            z.writestr("OEBPS/" + cover_name, cover_bytes)
         for i, row in enumerate(rows, 1):
             z.writestr(f"OEBPS/chap{i:06d}.xhtml", chapter_xhtml(row))
 
@@ -356,12 +392,39 @@ def assemble(plan: dict, chunks_dir: Path, output_dir: Path) -> Path:
             "chapter batches; final EPUB cannot contain a description.",
             flush=True,
         )
-    _epub(book, merged, title, author, language, url, description=description)
+    cover_name = ""
+    for piece in plan["pieces"]:
+        folder = chunks_dir / (
+            f"chapter-batch-{key}-{piece['start']:05d}-{piece['end']:05d}"
+        ) / "book"
+        candidate_name = next((
+            meta.get("cover_image") for meta in titles
+            if meta.get("cover_image") in ("cover.jpg", "cover.png")
+        ), None)
+        if not candidate_name:
+            break
+        candidate = folder / candidate_name
+        if candidate.is_file():
+            from tools.novel_covers import write_cover
+            cover_name = write_cover(
+                book, candidate.read_bytes(), candidate.suffix.lower()
+            )
+            break
+    if not cover_name:
+        print("WARNING: No cover image available in chapter batches.", flush=True)
+    _epub(book, merged, title, author, language, url,
+          description=description,
+          cover_path=(book / cover_name if cover_name else None))
     epub_metadata, from_epub = epub_chapters(book / "source.epub")
     if len(from_epub) != len(merged):
         raise ValueError("Combined EPUB does not contain every selected chapter")
     if description and epub_metadata.get("description") != description:
         raise ValueError("Combined EPUB lost its synopsis metadata")
+    if cover_name:
+        from tools.novel_covers import extract_epub_cover
+        extracted = extract_epub_cover(book / "source.epub")
+        if extracted is None or extracted[0] != (book / cover_name).read_bytes():
+            raise ValueError("Combined EPUB lost its cover image")
     metadata = {
         "title": title, "author": author, "language": language,
         "source_url": url, "chapter_count": len(merged),
@@ -372,6 +435,8 @@ def assemble(plan: dict, chunks_dir: Path, output_dir: Path) -> Path:
     if description:
         metadata["description"] = description
         metadata["synopsis"] = description
+    if cover_name:
+        metadata["cover_image"] = cover_name
     (book / "metadata.json").write_text(json.dumps(metadata, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     (book / "chapters.json").write_text(json.dumps(merged, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(f"ASSEMBLED {len(merged)} verified TXT chapters and EPUB in {book}", flush=True)
