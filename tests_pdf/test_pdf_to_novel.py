@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 from zipfile import ZipFile
 
 import fitz
@@ -64,6 +65,23 @@ class ConverterTests(unittest.TestCase):
             self.assertEqual(source.read_bytes(), pdf_bytes)
             summary = json.loads(report_file.read_text(encoding="utf-8"))
             self.assertEqual(summary["body_lines_expected"], summary["body_lines_emitted"])
+
+    def test_pdf_hashing_never_reads_whole_input_into_memory(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source = root / "test.pdf"
+            fixture(source)
+            with patch.object(Path, "read_bytes", side_effect=AssertionError("whole-file read forbidden")):
+                archive, _ = convert(source, root / "out", progress=lambda _: None)
+            self.assertEqual(validate_zip(archive)["chapter_count"], 2)
+
+    def test_pdf_size_budget_rejects_before_parsing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            src = Path(tmp) / "too-large.pdf"
+            fixture(src)
+            with patch("tools.pdf_to_novel.MAX_PDF_BYTES", 1):
+                with self.assertRaisesRegex(ConversionError, "safety budget"):
+                    analyse(src)
 
     def test_duplicate_or_missing_chapters_fail_closed(self):
         with tempfile.TemporaryDirectory() as tmp:
