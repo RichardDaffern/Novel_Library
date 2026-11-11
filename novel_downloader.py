@@ -182,7 +182,7 @@ def _export_epub_files(epub_path: Path, output_dir: Path, source_url: str | None
         for row in rows:
             name = row.get("file") if isinstance(row, dict) else None
             if (not isinstance(name, str) or Path(name).name != name
-                    or not re.fullmatch(r"chapter_[a-zA-Z0-9_-]+\\.txt", name)):
+                    or not re.fullmatch(r"chapter_[a-zA-Z0-9_-]+\.txt", name)):
                 raise ValueError("Existing chapter manifest has an unsafe filename")
             owned_chapters.add(name)
     previous_cover = ""
@@ -365,6 +365,7 @@ def main(argv: list[str] | None = None) -> int:
     if options.begin_chapter and options.end_chapter and options.end_chapter < options.begin_chapter:
         parser.error("--end-chapter must not precede --begin-chapter")
 
+    pending_download: Path | None = None
     try:
         if options.url or options.self_test:
             url = validate_url(options.url) if options.url else "http://test1.com?sid=123"
@@ -396,7 +397,15 @@ def main(argv: list[str] | None = None) -> int:
                     raise ValueError(
                         "Existing EPUB has no verified source identity; use --overwrite to re-download")
             book_dir.mkdir(parents=True, exist_ok=True)
-            if not epub.is_file() or options.overwrite:
+            if options.overwrite and epub.is_file():
+                # Redownload outside the published directory, so failed refreshes
+                # leave the last complete novel untouched.
+                pending_download = Path(tempfile.mkdtemp(
+                    prefix=f".{book_dir.name}.redownload-", dir=book_dir.parent))
+                run_fanficfare(url, pending_download, False, options.begin_chapter,
+                               options.end_chapter, options.timeout_minutes)
+                epub = pending_download / "source.epub"
+            elif not epub.is_file():
                 run_fanficfare(url, book_dir.resolve(), False, options.begin_chapter, options.end_chapter, options.timeout_minutes)
             else:
                 print(f"Using existing EPUB: {epub}. Use --overwrite to fetch anew.", flush=True)
@@ -413,13 +422,22 @@ def main(argv: list[str] | None = None) -> int:
                     raise ValueError(
                         "Different EPUB already exists for this title; "
                         "use --slug to keep both or --overwrite to replace intentionally")
-            book_dir.mkdir(parents=True, exist_ok=True)
-            if input_epub != epub.resolve():
-                shutil.copyfile(input_epub, epub)
+            # export_epub publishes the incoming EPUB together with its chapter
+            # representation; never replace the live source before validation.
+            epub = input_epub
 
         if not epub.is_file():
             raise RuntimeError("FanFicFare finished without creating source.epub")
         first_position = (options.begin_chapter or 1) if (options.url or options.self_test) else 1
+        # Fail before publication if the downloaded EPUB is incomplete.
+        _, pending_chapters = epub_chapters(epub)
+        expected_range = (options.end_chapter - options.begin_chapter + 1
+                          if options.begin_chapter is not None and options.end_chapter is not None
+                          else None)
+        if expected_range is not None and len(pending_chapters) != expected_range:
+            raise ValueError(f"Expected {expected_range} chapters in range, found {len(pending_chapters)}")
+        if options.expected_chapters is not None and len(pending_chapters) != options.expected_chapters:
+            raise ValueError(f"Expected {options.expected_chapters} chapters, found {len(pending_chapters)}")
         meta = export_epub(epub, book_dir, url, first_position=first_position)
         if options.begin_chapter is not None and options.end_chapter is not None:
             expected = options.end_chapter - options.begin_chapter + 1
@@ -440,6 +458,9 @@ def main(argv: list[str] | None = None) -> int:
     except (ValueError, OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired, RuntimeError, zipfile.BadZipFile, ET.ParseError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr, flush=True)
         return 1
+    finally:
+        if pending_download is not None:
+            shutil.rmtree(pending_download, ignore_errors=True)
 
 
 if __name__ == "__main__":
