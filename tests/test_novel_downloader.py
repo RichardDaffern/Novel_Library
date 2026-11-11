@@ -221,6 +221,99 @@ class NovelDownloaderTests(unittest.TestCase):
             with self.subTest(url=url), self.assertRaises(ValueError):
                 validate_url(url)
 
+    def test_failed_publish_rename_rolls_back_complete_previous_book(self):
+        """A failure after moving the old folder cannot lose an existing novel."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            old_source = self.make_epub(root)
+            incoming = root / "incoming"
+            incoming.mkdir()
+            new_source = self.make_epub(incoming, ["Chapter 1: Replacement"])
+            output = root / "output with spaces"
+            export_epub(old_source, output)
+            original = {p.name: p.read_bytes() for p in output.iterdir() if p.is_file()}
+            original_replace = Path.replace
+            caught = []
+
+            def fail_only_final_publish(path, target):
+                if (path.name == output.name
+                        and path.parent.name.startswith("." + output.name + ".export-")
+                        and Path(target) == output):
+                    caught.append(True)
+                    raise OSError("simulated failure when publishing the prepared export")
+                return original_replace(path, target)
+
+            with patch.object(Path, "replace", new=fail_only_final_publish):
+                with self.assertRaisesRegex(OSError, "simulated failure"):
+                    export_epub(new_source, output)
+
+            self.assertEqual(caught, [True], "Injected failure did not reach the publish step")
+            self.assertEqual(original, {p.name: p.read_bytes() for p in output.iterdir() if p.is_file()})
+            self.assertFalse(list(root.glob("." + output.name + ".backup-*")))
+
+    def test_truncated_forced_redownload_cannot_replace_previous_book(self):
+        """An invalid refresh must leave the complete exported novel untouched."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            initial_source = self.make_epub(root)
+            folder = root / "short"
+            folder.mkdir()
+            short_source = self.make_epub(folder, ["Chapter 1: Incomplete"])
+            url = "https://example.org/a-complete-story"
+            base_args = [url, "--confirm-rights", "--expected-chapters", "3",
+                         "--output-dir", str(root / "downloaded")]
+
+            def initial_download(url, destination, *args):
+                shutil.copyfile(initial_source, destination / "source.epub")
+
+            with patch("novel_downloader.run_fanficfare", side_effect=initial_download):
+                self.assertEqual(main(base_args), 0)
+            book = next((root / "downloaded").iterdir())
+            before = {p.name: p.read_bytes() for p in book.iterdir() if p.is_file()}
+
+            def incomplete_download(url, destination, *args):
+                shutil.copyfile(short_source, destination / "source.epub")
+
+            with patch("novel_downloader.run_fanficfare", side_effect=incomplete_download):
+                self.assertEqual(main(base_args + ["--overwrite"]), 1)
+            self.assertEqual(before, {p.name: p.read_bytes() for p in book.iterdir() if p.is_file()})
+            self.assertEqual(len(list((root / "downloaded").iterdir())), 1)
+
+    def test_matching_source_url_reuses_cached_epub_without_network(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source = self.make_epub(root)
+            url = "https://example.org/reusable-book"
+            args = [url, "--confirm-rights", "--output-dir", str(root / "library")]
+
+            def initial_download(url, destination, *extra):
+                shutil.copyfile(source, destination / "source.epub")
+
+            with patch("novel_downloader.run_fanficfare", side_effect=initial_download):
+                self.assertEqual(main(args), 0)
+            book = next((root / "library").iterdir())
+            original_epub = (book / "source.epub").read_bytes()
+            with patch("novel_downloader.run_fanficfare", side_effect=AssertionError("download should be skipped")):
+                self.assertEqual(main(args), 0)
+            self.assertEqual((book / "source.epub").read_bytes(), original_epub)
+            self.assertEqual(json.loads((book / "metadata.json").read_text())["source_url"], url)
+
+    def test_incomplete_explicit_range_is_rejected_before_manifest_publish(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source = self.make_epub(root, ["Only one chapter"])
+
+            def short_download(url, destination, *extra):
+                shutil.copyfile(source, destination / "source.epub")
+
+            with patch("novel_downloader.run_fanficfare", side_effect=short_download):
+                rc = main(["--self-test", "--chapter-range", "3-4",
+                           "--output-dir", str(root / "out")])
+            self.assertEqual(rc, 1)
+            book = next((root / "out").iterdir())
+            self.assertFalse((book / "chapters.json").exists())
+            self.assertFalse((book / "metadata.json").exists())
+
     def test_public_domain_style_epub_without_fanficfare_markers(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
