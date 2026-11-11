@@ -7,12 +7,11 @@ Linux/macOS for offline testing: python -m tools.pdf_batch --confirm-rights
 from __future__ import annotations
 
 import argparse
-from hashlib import sha256
 from pathlib import Path
 import sys
 from zipfile import BadZipFile, LargeZipFile
 
-from tools.pdf_to_novel import ConversionError, analyse, convert, validate_zip
+from tools.pdf_to_novel import ConversionError, analyse, convert, file_sha256, validate_zip
 
 REPOSITORY = Path(__file__).resolve().parents[1]
 DEFAULT_PDFS = REPOSITORY / "PDF-to-Novel" / "PDFs"
@@ -20,11 +19,7 @@ DEFAULT_NOVELS = REPOSITORY / "PDF-to-Novel" / "Novels"
 
 
 def _pdf_sha256(path: Path) -> str:
-    digest = sha256()
-    with path.open("rb") as f:
-        for chunk in iter(lambda: f.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
+    return file_sha256(path)
 
 
 def _inspection_plan(pdf: Path, output_dir: Path, report=print) -> None:

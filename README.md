@@ -9,7 +9,7 @@ Local-first novel downloader built using FanFicFare. Produces numbered UTF-8 TXT
 Install Python 3.12 and the dependencies:
 
 ~~~powershell
-python -m pip install -r requirements.txt
+python -m pip install -r requirements.lock
 python -m unittest discover -s tests -v
 ~~~
 
@@ -26,7 +26,19 @@ python -u novel_downloader.py "https://example.org/novel" --confirm-rights
 python -u novel_downloader.py "https://example.org/novel" --confirm-rights --chapter-range 1-30
 ~~~
 
+The standalone downloader uses a readable folder name plus a source-URL digest so unrelated novels with the same last URL segment cannot collide. When using an explicit `--slug`, an existing EPUB is reused only if its `metadata.json` records the same source URL. Unverified legacy EPUBs are not silently reused; choose `--overwrite` to fetch again. Two imported EPUBs with the same title require a different `--slug`, or an explicit `--overwrite` if replacement is intended.
+
+For direct whole-book downloads, `--expected-chapters N` rejects incomplete results **before publishing**. Without an authoritative count, the direct CLI warns that it cannot prove completeness; the GitHub Actions batch workflow already discovers and validates the whole novel's chapter count.
+
+Exports are prepared in a sibling staging directory, and prior exports are backed up during replacement. Failed writes roll back, and interrupted backups are recovered on the next export invocation. A short rename gap can occur during a process crash; this is a recoverable swap rather than a truly atomic multi-file filesystem transaction.
+
 Chapter ranges are one-based, inclusive positions in the site's chapter index. The script prints a chapter-completion percentage and writes a TXT file into the chapters_in_progress directory as soon as each chapter finishes. After successful EPUB creation, it exports the final chapters, manifest and metadata and removes temporary checkpoints.
+
+## Reproducible Python installs
+
+CI and GitHub download workflows use `requirements.lock`; the PDF converter uses `requirements-pdf.lock`. Both pin direct and transitive package versions resolved with Python 3.12. Local development can use the original `requirements.txt` / `requirements-pdf.txt` when intentionally upgrading dependencies, but ordinary users should install from the locks. Regenerate and commit locks after testing deliberate dependency updates. The lockfiles pin versions, not wheel hashes.
+
+The PDF converter also limits input to 1 GiB and 50,000 pages by default. Its file hashing and ZIP chapter-member writing avoid whole-document duplicate byte buffers; PDF page analysis and EPUB construction still require memory proportional to novel size.
 
 ## GitHub Actions: NovelFull - Download
 

@@ -31,6 +31,8 @@ CHAPTER_ONLY = re.compile(r"^(?:chapter|chap\.?)\s+(\d{1,6})\s*$", re.I)
 SPECIAL_HEADING = re.compile(r"^(prologue|epilogue)\b(?:\s*[:.-]\s*(.*))?$", re.I)
 LIGATURES = str.maketrans({"\ufb00": "ff", "\ufb01": "fi", "\ufb02": "fl", "\ufb03": "ffi", "\ufb04": "ffl", "\ufb05": "st", "\ufb06": "st"})
 MAX_CHAPTERS = 20000
+MAX_PDF_BYTES = 1024 * 1024 * 1024  # Refuse unexpectedly large input (1 GiB)
+MAX_PDF_PAGES = 50_000
 
 
 class ConversionError(ValueError):
@@ -162,7 +164,11 @@ def _manual_boundaries(path: Path) -> list[dict]:
 def analyse(pdf: Path, boundaries_path: Path | None = None, progress=lambda _: None):
     if not pdf.is_file() or pdf.suffix.lower() != ".pdf":
         raise ConversionError("Provide an existing PDF file")
+    if pdf.stat().st_size > MAX_PDF_BYTES:
+        raise ConversionError("PDF exceeds the 1 GiB input safety budget")
     with fitz.open(pdf) as document:
+        if len(document) > MAX_PDF_PAGES:
+            raise ConversionError("PDF exceeds the 50,000-page safety budget")
         if document.needs_pass:
             raise ConversionError("Password-protected PDF is unsupported")
         pages = read_lines(document, progress)
@@ -416,6 +422,15 @@ def validate_zip(path: Path, expected_chapters: int | None = None) -> dict:
                 "zip_members": len(files), "epub_spine_chapters": len(spine)}
 
 
+def file_sha256(path: Path) -> str:
+    """Calculate file identity without materialising the whole PDF in memory."""
+    digest = sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
 def convert(pdf: Path, output_dir: Path, *, title: str = "", author: str = "",
             language: str = "en", description: str = "", boundaries: Path | None = None,
             expected_chapters: int | None = None, replace: bool = False, progress=print) -> tuple[Path, Path]:
@@ -430,8 +445,7 @@ def convert(pdf: Path, output_dir: Path, *, title: str = "", author: str = "",
         raise ConversionError("PDF has no author; supply --author")
     if not re.fullmatch(r"[a-zA-Z]{2,3}(?:-[a-zA-Z]{2,4})?", language):
         raise ConversionError("Invalid language tag")
-    original = pdf.read_bytes()
-    input_hash = sha256(original).hexdigest()
+    input_hash = file_sha256(pdf)
     url = "pdf://sha256/" + input_hash
     book_slug = slugify(title)
     if book_slug == "novel":
@@ -445,7 +459,7 @@ def convert(pdf: Path, output_dir: Path, *, title: str = "", author: str = "",
         raise ConversionError(f"Refusing to overwrite existing ZIP: {target}")
     chapters, coverage = collect_chapters(pages, markers)
     report.update(coverage)
-    rows, plain_bodies, txt = [], [], {}
+    rows, plain_bodies = [], []
     short = []
     for i, chapter in enumerate(chapters, 1):
         body = chapter["body"]
@@ -456,7 +470,6 @@ def convert(pdf: Path, output_dir: Path, *, title: str = "", author: str = "",
                      "title": chapter["title"], "file": name, "word_count": words,
                      "sha256": sha256(saved).hexdigest()})
         plain_bodies.append(body)
-        txt[name] = saved
         if words < 150:
             short.append({"chapter": i, "word_count": words})
     report["suspiciously_short_chapters"] = short
@@ -476,7 +489,7 @@ def convert(pdf: Path, output_dir: Path, *, title: str = "", author: str = "",
     epub = epub_bytes(title, author, language, rows, plain_bodies, url, cover, description)
     members = {"metadata.json": (json.dumps(metadata, ensure_ascii=False, indent=2) + "\n").encode(),
                "chapters.json": (json.dumps(rows, ensure_ascii=False, indent=2) + "\n").encode(),
-               "source.epub": epub, **txt}
+               "source.epub": epub}
     if cover:
         members[cover[1]] = cover[0]
     staged = None
@@ -486,6 +499,11 @@ def convert(pdf: Path, output_dir: Path, *, title: str = "", author: str = "",
         with ZipFile(staged, "w", ZIP_DEFLATED, compresslevel=6) as archive:
             for name, data in members.items():
                 archive.writestr(book_slug + "/" + name, data)
+            # Stream each chapter into the outer archive without retaining a
+            # second complete dictionary of TXT payloads in memory.
+            for chapter, row in zip(chapters, rows):
+                data = f"{chapter['title']}\n\n{chapter['body']}\n".encode("utf-8")
+                archive.writestr(book_slug + "/" + row["file"], data)
         result = validate_zip(staged, expected_chapters=len(rows))
         report.update({"validation": result, "output_zip": str(target),
                        "source_pdf_sha256": input_hash})

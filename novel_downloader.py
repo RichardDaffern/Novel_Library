@@ -7,6 +7,9 @@ Requires the user to have permission to download and store the selected work.
 from __future__ import annotations
 
 import argparse
+import ipaddress
+import tempfile
+from uuid import uuid4
 from datetime import datetime, timezone
 import hashlib
 import json
@@ -46,11 +49,25 @@ def slugify(value: str) -> str:
 
 
 def validate_url(value: str) -> str:
+    """Reject non-public destinations before handing URLs to FanFicFare.
+
+    FanFicFare's site adapters additionally restrict supported book URLs; this
+    check does not attempt to control DNS or adapter-internal redirects.
+    """
     url = urlsplit(value)
-    if url.scheme != "https" or not url.hostname or url.username or url.password:
+    host = (url.hostname or "").lower().rstrip(".")
+    if url.scheme != "https" or not host or url.username or url.password:
         raise ValueError("Use an HTTPS novel URL without embedded credentials.")
-    if url.hostname in {"localhost", "127.0.0.1", "0.0.0.0", "::1"}:
-        raise ValueError("A public, supported novel website URL is required.")
+    if url.port not in (None, 443) or "." not in host:
+        raise ValueError("A public HTTPS novel website URL is required.")
+    try:
+        address = ipaddress.ip_address(host)
+    except ValueError:
+        address = None
+    if (address is not None or re.fullmatch(r"[0-9.]+", host)
+            or host == "localhost" or host.endswith((".localhost", ".local", ".internal", ".test"))
+            or host.startswith("localhost.")):
+        raise ValueError("IP literals and non-public hostnames are not supported.")
     return value
 
 
@@ -152,17 +169,35 @@ def epub_chapters(epub_path: Path) -> tuple[dict, list[dict]]:
     return book, chapters
 
 
-def export_epub(epub_path: Path, output_dir: Path, source_url: str | None = None, first_position: int = 1) -> dict:
+def _export_epub_files(epub_path: Path, output_dir: Path, source_url: str | None = None, first_position: int = 1) -> dict:
     book, chapters = epub_chapters(epub_path)
     output_dir.mkdir(parents=True, exist_ok=True)
+    # Only files declared by a previous successful export belong to this tool.
+    previous = output_dir / "chapters.json"
+    owned_chapters: set[str] = set()
+    if previous.exists():
+        rows = json.loads(previous.read_text(encoding="utf-8"))
+        if not isinstance(rows, list):
+            raise ValueError("Existing chapter manifest is invalid; refusing unsafe cleanup")
+        for row in rows:
+            name = row.get("file") if isinstance(row, dict) else None
+            if (not isinstance(name, str) or Path(name).name != name
+                    or not re.fullmatch(r"chapter_[a-zA-Z0-9_-]+\.txt", name)):
+                raise ValueError("Existing chapter manifest has an unsafe filename")
+            owned_chapters.add(name)
+    previous_cover = ""
+    previous_metadata = output_dir / "metadata.json"
+    if previous_metadata.exists():
+        data = json.loads(previous_metadata.read_text(encoding="utf-8"))
+        if not isinstance(data, dict):
+            raise ValueError("Existing metadata is invalid")
+        previous_cover = data.get("cover_image", "")
     from tools.novel_covers import extract_epub_cover, write_cover
     cover = extract_epub_cover(epub_path)
     if cover:
         book["cover_image"] = write_cover(output_dir, *cover)
-    else:
-        # A previously exported cover must not be mistaken for this EPUB's artwork.
-        for suffix in (".jpg", ".png"):
-            (output_dir / ("cover" + suffix)).unlink(missing_ok=True)
+    if previous_cover in ("cover.jpg", "cover.png") and previous_cover != book.get("cover_image"):
+        (output_dir / previous_cover).unlink(missing_ok=True)
     used_names = set()
     results = []
     next_number = 1
@@ -189,9 +224,8 @@ def export_epub(epub_path: Path, output_dir: Path, source_url: str | None = None
             "sha256": hashlib.sha256(content.encode("utf-8")).hexdigest(),
         })
 
-    for stale in output_dir.glob("chapter_*.txt"):
-        if stale.name not in used_names:
-            stale.unlink()
+    for name in owned_chapters - used_names:
+        (output_dir / name).unlink(missing_ok=True)
     metadata = {
         **book, "source_url": source_url, "chapter_count": len(results),
         "created_at_utc": datetime.now(timezone.utc).isoformat(),
@@ -203,6 +237,53 @@ def export_epub(epub_path: Path, output_dir: Path, source_url: str | None = None
     (output_dir / "chapters.json").write_text(json.dumps(results, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     return metadata
 
+
+
+def export_epub(epub_path: Path, output_dir: Path, source_url: str | None = None, first_position: int = 1) -> dict:
+    """Prepare a whole export off-line and publish with rollback on rename errors.
+
+    The previous directory is moved to a backup just before publication. If
+    interrupted at that boundary, a subsequent invocation restores the backup.
+    Unrelated chapter-named files are not selected for cleanup.
+    """
+    epub_path, output_dir = Path(epub_path), Path(output_dir)
+    parent = output_dir.parent
+    parent.mkdir(parents=True, exist_ok=True)
+    backups = sorted(parent.glob(f".{output_dir.name}.backup-*"))
+    if not output_dir.exists() and backups:
+        if len(backups) != 1 or not backups[0].is_dir():
+            raise ValueError("Ambiguous interrupted export backups; manual recovery required")
+        backups[0].replace(output_dir)
+    with tempfile.TemporaryDirectory(prefix=f".{output_dir.name}.export-", dir=parent) as temp:
+        stage = Path(temp) / output_dir.name
+        if output_dir.exists():
+            if not output_dir.is_dir():
+                raise ValueError("Export destination is not a directory")
+            shutil.copytree(output_dir, stage)
+        else:
+            stage.mkdir()
+        staged_epub = stage / "source.epub"
+        if epub_path.resolve() != (output_dir / "source.epub").resolve():
+            shutil.copyfile(epub_path, staged_epub)
+        metadata = _export_epub_files(staged_epub, stage, source_url, first_position)
+        backup = parent / f".{output_dir.name}.backup-{uuid4().hex}"
+        moved_old = False
+        try:
+            if output_dir.exists():
+                output_dir.replace(backup)
+                moved_old = True
+            stage.replace(output_dir)
+        except OSError:
+            if moved_old and backup.exists() and not output_dir.exists():
+                backup.replace(output_dir)
+            raise
+        if moved_old:
+            # A failure to clean this backup must not invalidate the published book.
+            try:
+                shutil.rmtree(backup)
+            except OSError:
+                print(f"WARNING: Previous export backup retained: {backup}", file=sys.stderr)
+        return metadata
 
 def run_fanficfare(url: str, book_dir: Path, list_only: bool, start: int | None, end: int | None, timeout_minutes: int = 120) -> None:
     executable = shutil.which("fanficfare")
@@ -226,6 +307,23 @@ def run_fanficfare(url: str, book_dir: Path, list_only: bool, start: int | None,
     subprocess.run(args, cwd=book_dir, check=True, timeout=timeout_minutes * 60)
 
 
+def _same_file_content(a: Path, b: Path) -> bool:
+    if a.stat().st_size != b.stat().st_size:
+        return False
+    def digest(path: Path) -> str:
+        result = hashlib.sha256()
+        with path.open("rb") as stream:
+            for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+                result.update(chunk)
+        return result.hexdigest()
+    return digest(a) == digest(b)
+
+
+def _completed_chapters(output_dir: Path) -> int:
+    rows = json.loads((output_dir / "chapters.json").read_text(encoding="utf-8"))
+    return len(rows)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("url", nargs="?", help="Story URL supported by FanFicFare")
@@ -237,7 +335,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--end-chapter", type=int, help="Last chapter position in FanFicFare's index (inclusive)")
     parser.add_argument("--output-dir", type=Path, default=Path("downloads"))
     parser.add_argument("--slug", help="Optional folder name for the novel")
-    parser.add_argument("--overwrite", action="store_true", help="Download afresh even if source.epub already exists")
+    parser.add_argument("--overwrite", action="store_true", help="Replace a verified same-source download, or explicitly replace a local EPUB import")
+    parser.add_argument("--expected-chapters", type=int, help="Optional expected number of chapters for unrestricted downloads")
     parser.add_argument("--timeout-minutes", type=int, default=120, help="Total download runtime limit (default 120)")
     parser.add_argument("--self-test", action="store_true", help="Run FanFicFare built-in 9-chapter test story without network")
     options = parser.parse_args(argv)
@@ -246,6 +345,8 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("Supply exactly one of URL, --import-epub or --self-test")
     if options.timeout_minutes < 1:
         parser.error("--timeout-minutes must be positive")
+    if options.expected_chapters is not None and options.expected_chapters < 1:
+        parser.error("--expected-chapters must be positive")
     if options.url and not options.confirm_rights:
         parser.error("Confirm that you have the rights and permission to archive the work with --confirm-rights")
     if options.chapter_range:
@@ -264,13 +365,18 @@ def main(argv: list[str] | None = None) -> int:
     if options.begin_chapter and options.end_chapter and options.end_chapter < options.begin_chapter:
         parser.error("--end-chapter must not precede --begin-chapter")
 
+    pending_download: Path | None = None
     try:
         if options.url or options.self_test:
             url = validate_url(options.url) if options.url else "http://test1.com?sid=123"
             if options.list_only:
                 run_fanficfare(url, Path.cwd(), True, None, None, options.timeout_minutes)
                 return 0
-            base = "fanficfare-smoke-test" if options.self_test else slugify(Path(urlsplit(url).path).stem)
+            # A readable prefix alone is not a novel identity: different sites
+            # routinely reuse the same title or terminal URL path.
+            base = ("fanficfare-smoke-test" if options.self_test else
+                    slugify(Path(urlsplit(url).path).stem) + "-" +
+                    hashlib.sha256(url.encode("utf-8")).hexdigest()[:12])
             # Separate output names prevent a new batch reusing an earlier EPUB.
             if options.begin_chapter is not None or options.end_chapter is not None:
                 first = str(options.begin_chapter or 1).zfill(4)
@@ -278,9 +384,28 @@ def main(argv: list[str] | None = None) -> int:
                 base = f"{base}-chapters-{first}-{last}"
             name = options.slug or base
             book_dir = options.output_dir / slugify(name)
-            book_dir.mkdir(parents=True, exist_ok=True)
             epub = book_dir / "source.epub"
-            if not epub.is_file() or options.overwrite:
+            prior_metadata = book_dir / "metadata.json"
+            if epub.is_file():
+                if prior_metadata.is_file():
+                    prior_url = json.loads(prior_metadata.read_text(encoding="utf-8")).get("source_url")
+                    if prior_url != url:
+                        raise ValueError(
+                            f"Existing EPUB belongs to {prior_url!r}, not {url!r}; "
+                            "choose a different --slug to protect both novels")
+                elif not options.overwrite:
+                    raise ValueError(
+                        "Existing EPUB has no verified source identity; use --overwrite to re-download")
+            book_dir.mkdir(parents=True, exist_ok=True)
+            if options.overwrite and epub.is_file():
+                # Redownload outside the published directory, so failed refreshes
+                # leave the last complete novel untouched.
+                pending_download = Path(tempfile.mkdtemp(
+                    prefix=f".{book_dir.name}.redownload-", dir=book_dir.parent))
+                run_fanficfare(url, pending_download, False, options.begin_chapter,
+                               options.end_chapter, options.timeout_minutes)
+                epub = pending_download / "source.epub"
+            elif not epub.is_file():
                 run_fanficfare(url, book_dir.resolve(), False, options.begin_chapter, options.end_chapter, options.timeout_minutes)
             else:
                 print(f"Using existing EPUB: {epub}. Use --overwrite to fetch anew.", flush=True)
@@ -291,19 +416,40 @@ def main(argv: list[str] | None = None) -> int:
                 raise FileNotFoundError(input_epub)
             book, _ = epub_chapters(input_epub)
             book_dir = options.output_dir / slugify(options.slug or book["title"] or input_epub.stem)
-            book_dir.mkdir(parents=True, exist_ok=True)
             epub = book_dir / "source.epub"
-            if input_epub != epub.resolve():
-                shutil.copyfile(input_epub, epub)
+            if epub.is_file() and input_epub != epub.resolve():
+                if not options.overwrite and not _same_file_content(input_epub, epub):
+                    raise ValueError(
+                        "Different EPUB already exists for this title; "
+                        "use --slug to keep both or --overwrite to replace intentionally")
+            # export_epub publishes the incoming EPUB together with its chapter
+            # representation; never replace the live source before validation.
+            epub = input_epub
 
         if not epub.is_file():
             raise RuntimeError("FanFicFare finished without creating source.epub")
         first_position = (options.begin_chapter or 1) if (options.url or options.self_test) else 1
+        # Fail before publication if the downloaded EPUB is incomplete.
+        _, pending_chapters = epub_chapters(epub)
+        expected_range = (options.end_chapter - options.begin_chapter + 1
+                          if options.begin_chapter is not None and options.end_chapter is not None
+                          else None)
+        if expected_range is not None and len(pending_chapters) != expected_range:
+            raise ValueError(f"Expected {expected_range} chapters in range, found {len(pending_chapters)}")
+        if options.expected_chapters is not None and len(pending_chapters) != options.expected_chapters:
+            raise ValueError(f"Expected {options.expected_chapters} chapters, found {len(pending_chapters)}")
         meta = export_epub(epub, book_dir, url, first_position=first_position)
         if options.begin_chapter is not None and options.end_chapter is not None:
             expected = options.end_chapter - options.begin_chapter + 1
             if meta["chapter_count"] != expected:
                 raise ValueError(f"Expected {expected} chapters in range but exported {meta['chapter_count']}; checkpoints retained")
+        if options.expected_chapters is not None and meta["chapter_count"] != options.expected_chapters:
+            raise ValueError(f"Expected {options.expected_chapters} chapters, exported {meta['chapter_count']}")
+        if (options.url and options.begin_chapter is None and options.end_chapter is None
+                and options.expected_chapters is None):
+            print("WARNING: No authoritative expected chapter count; this direct download "
+                  "cannot establish full-book completeness. Use the bounded batch workflow "
+                  "for verified full novels.", flush=True)
         checkpoint_dir = book_dir / "chapters_in_progress"
         if checkpoint_dir.exists():
             shutil.rmtree(checkpoint_dir)
@@ -312,6 +458,9 @@ def main(argv: list[str] | None = None) -> int:
     except (ValueError, OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired, RuntimeError, zipfile.BadZipFile, ET.ParseError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr, flush=True)
         return 1
+    finally:
+        if pending_download is not None:
+            shutil.rmtree(pending_download, ignore_errors=True)
 
 
 if __name__ == "__main__":

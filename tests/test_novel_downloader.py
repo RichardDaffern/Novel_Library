@@ -1,4 +1,5 @@
 import json
+import shutil
 from html import escape
 from pathlib import Path
 import tempfile
@@ -84,6 +85,141 @@ class NovelDownloaderTests(unittest.TestCase):
             rc = main(["--import-epub", str(epub), "--output-dir", str(root / "downloads")])
             self.assertEqual(rc, 0)
             self.assertTrue((root / "downloads/example-novel/source.epub").is_file())
+
+
+    def test_distinct_sources_with_identical_path_stems_get_distinct_directories(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            fixture = self.make_epub(root)
+            def download(url, directory, *args):
+                shutil.copyfile(fixture, directory / "source.epub")
+            with patch("novel_downloader.run_fanficfare", side_effect=download):
+                first = main(["https://example.org/story/identical", "--confirm-rights", "--output-dir", str(root / "out")])
+                second = main(["https://example.com/books/identical", "--confirm-rights", "--output-dir", str(root / "out")])
+            self.assertEqual((first, second), (0, 0))
+            folders = list((root / "out").iterdir())
+            self.assertEqual(len(folders), 2)
+            self.assertEqual({json.loads((p / "metadata.json").read_text())["source_url"] for p in folders},
+                             {"https://example.org/story/identical", "https://example.com/books/identical"})
+
+    def test_explicit_slug_cannot_reuse_a_different_url(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            fixture = self.make_epub(root)
+            def download(url, directory, *args):
+                shutil.copyfile(fixture, directory / "source.epub")
+            with patch("novel_downloader.run_fanficfare", side_effect=download):
+                self.assertEqual(main(["https://example.org/a", "--confirm-rights", "--slug", "shared",
+                                       "--output-dir", str(root / "out")]), 0)
+                self.assertEqual(main(["https://example.com/b", "--confirm-rights", "--slug", "shared",
+                                       "--output-dir", str(root / "out"), "--overwrite"]), 1)
+            saved = json.loads((root / "out/shared/metadata.json").read_text())
+            self.assertEqual(saved["source_url"], "https://example.org/a")
+
+    def test_same_title_import_refuses_different_epub_unless_explicit_overwrite(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            a, b = root / "a", root / "b"
+            a.mkdir()
+            b.mkdir()
+            first = self.make_epub(a)
+            second = self.make_epub(b, ["Different Chapter", "Chapter 1: New"])
+            cmd = ["--import-epub", str(first), "--output-dir", str(root / "out")]
+            self.assertEqual(main(cmd), 0)
+            target = root / "out/example-novel/source.epub"
+            original = target.read_bytes()
+            self.assertEqual(main(["--import-epub", str(second), "--output-dir", str(root / "out")]), 1)
+            self.assertEqual(target.read_bytes(), original)
+            self.assertEqual(main(["--import-epub", str(second), "--output-dir", str(root / "out"),
+                                   "--overwrite"]), 0)
+            self.assertEqual(target.read_bytes(), second.read_bytes())
+
+    def test_failed_stage_write_preserves_old_chapters_and_manifest(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            a, b = root / "a", root / "b"
+            a.mkdir()
+            b.mkdir()
+            first = self.make_epub(a)
+            second = self.make_epub(b, ["Only one different chapter"])
+            out = root / "out"
+            export_epub(first, out)
+            original = {p.name: p.read_bytes() for p in out.iterdir() if p.is_file()}
+            write = Path.write_text
+            def fail_manifest(path, content, *args, **kwargs):
+                if path.name == "chapters.json":
+                    raise OSError("injected failure before publication")
+                return write(path, content, *args, **kwargs)
+            with patch.object(Path, "write_text", fail_manifest):
+                with self.assertRaises(OSError):
+                    export_epub(second, out)
+            self.assertEqual(original, {p.name: p.read_bytes() for p in out.iterdir() if p.is_file()})
+
+    def test_failed_redownload_preserves_published_book(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            fixture = self.make_epub(root)
+            def download(url, directory, *args):
+                shutil.copyfile(fixture, directory / "source.epub")
+            args = ["https://example.org/same", "--confirm-rights", "--output-dir", str(root / "out")]
+            with patch("novel_downloader.run_fanficfare", side_effect=download):
+                self.assertEqual(main(args), 0)
+            book = next((root / "out").iterdir())
+            original = {p.name: p.read_bytes() for p in book.iterdir() if p.is_file()}
+            with patch("novel_downloader.run_fanficfare", side_effect=OSError("simulated download failure")):
+                self.assertEqual(main(args + ["--overwrite"]), 1)
+            self.assertEqual(original, {p.name: p.read_bytes() for p in book.iterdir() if p.is_file()})
+
+    def test_recovers_previous_export_backup_when_directory_is_missing(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            fixture = self.make_epub(root)
+            out = root / "out"
+            export_epub(fixture, out)
+            backup = root / ".out.backup-simulated-interruption"
+            out.replace(backup)
+            self.assertFalse(out.exists())
+            export_epub(fixture, out)
+            self.assertTrue((out / "metadata.json").is_file())
+            self.assertFalse(backup.exists())
+
+    def test_cleanup_preserves_untracked_chapter_named_file(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            a, b = root / "a", root / "b"
+            a.mkdir()
+            b.mkdir()
+            old = self.make_epub(a)
+            new = self.make_epub(b, ["Chapter 1: A Shorter Work"])
+            out = root / "out"
+            export_epub(old, out)
+            unrelated = out / "chapter_9999.txt"
+            unrelated.write_text("Not managed by Novel Library")
+            export_epub(new, out)
+            self.assertEqual(unrelated.read_text(), "Not managed by Novel Library")
+            rows = json.loads((out / "chapters.json").read_text())
+            self.assertEqual(len(rows), 1)
+            self.assertFalse((out / "chapter_0002.txt").exists())
+
+    def test_expected_chapters_rejects_short_successful_epub(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            fixture = self.make_epub(root)
+            def download(url, directory, *args):
+                shutil.copyfile(fixture, directory / "source.epub")
+            with patch("novel_downloader.run_fanficfare", side_effect=download):
+                rc = main(["https://example.org/book", "--confirm-rights",
+                           "--expected-chapters", "8", "--output-dir", str(root / "out")])
+            self.assertEqual(rc, 1)
+
+    def test_url_rejects_literal_ip_and_local_network_names(self):
+        for url in ("https://127.0.0.2/book", "https://169.254.169.254/book",
+                    "https://10.0.0.5/book", "https://[::1]/book",
+                    "https://[fc00::1]/book", "https://private.internal/book",
+                    "https://server.local/book", "https://localhost.evil.internal/book",
+                    "https://example.com:8443/book"):
+            with self.subTest(url=url), self.assertRaises(ValueError):
+                validate_url(url)
 
     def test_public_domain_style_epub_without_fanficfare_markers(self):
         with tempfile.TemporaryDirectory() as temp:
