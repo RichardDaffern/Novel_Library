@@ -155,6 +155,34 @@ class NovelDownloaderTests(unittest.TestCase):
                     export_epub(second, out)
             self.assertEqual(original, {p.name: p.read_bytes() for p in out.iterdir() if p.is_file()})
 
+    def test_failed_redownload_preserves_published_book(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            fixture = self.make_epub(root)
+            def download(url, directory, *args):
+                shutil.copyfile(fixture, directory / "source.epub")
+            args = ["https://example.org/same", "--confirm-rights", "--output-dir", str(root / "out")]
+            with patch("novel_downloader.run_fanficfare", side_effect=download):
+                self.assertEqual(main(args), 0)
+            book = next((root / "out").iterdir())
+            original = {p.name: p.read_bytes() for p in book.iterdir() if p.is_file()}
+            with patch("novel_downloader.run_fanficfare", side_effect=OSError("simulated download failure")):
+                self.assertEqual(main(args + ["--overwrite"]), 1)
+            self.assertEqual(original, {p.name: p.read_bytes() for p in book.iterdir() if p.is_file()})
+
+    def test_recovers_previous_export_backup_when_directory_is_missing(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            fixture = self.make_epub(root)
+            out = root / "out"
+            export_epub(fixture, out)
+            backup = root / ".out.backup-simulated-interruption"
+            out.replace(backup)
+            self.assertFalse(out.exists())
+            export_epub(fixture, out)
+            self.assertTrue((out / "metadata.json").is_file())
+            self.assertFalse(backup.exists())
+
     def test_cleanup_preserves_untracked_chapter_named_file(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
