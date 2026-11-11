@@ -79,6 +79,10 @@ def epub_chapters(epub_path: Path) -> tuple[dict, list[dict]]:
             "author": _first_text(package, "creator"),
             "language": _first_text(package, "language"),
         }
+        # Source genres and publication status are EPUB metadata, not chapter text.
+        # Preserve them for both direct imports and later batch assembly.
+        from tools.epub_source_metadata import source_metadata_from_package
+        book.update(source_metadata_from_package(package))
         # FanFicFare and other EPUB producers often store the synopsis as
         # HTML inside dc:description. Keep plain, readable text in metadata.
         raw_description = _first_text(package, "description")
