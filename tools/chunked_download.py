@@ -22,6 +22,7 @@ import tempfile
 import uuid
 from urllib.parse import urlsplit
 import zipfile
+from tools.epub_source_metadata import clean_genres, read_source_metadata
 
 from tools.download_registry import canonical_url, normalise_range
 from novel_downloader import epub_chapters, slugify
@@ -247,7 +248,8 @@ def fetch_piece(url: str, key: str, first: int, last: int, folder: Path,
 
 
 def _epub(book: Path, rows: list[dict], title: str, author: str, language: str, url: str,
-          description: str = "", cover_path: Path | None = None) -> None:
+          description: str = "", cover_path: Path | None = None,
+          genres: list[str] | None = None, status: str = "") -> None:
     def chapter_xhtml(chapter: dict) -> str:
         content = (book / chapter["file"]).read_text(encoding="utf-8")
         lines = content.split("\n", 2)
@@ -284,7 +286,10 @@ def _epub(book: Path, rows: list[dict], title: str, author: str, language: str, 
         '<metadata xmlns:dc="http://purl.org/dc/elements/1.1/">'
         f'<dc:title>{escape(title)}</dc:title><dc:creator>{escape(author)}</dc:creator>'
         f'<dc:language>{escape(language or "en")}</dc:language>'
-        + (f"<dc:description>{escape(description)}</dc:description>" if description else "") +
+        + (f"<dc:description>{escape(description)}</dc:description>" if description else "")
+        + "".join(f"<dc:subject>{escape(genre)}</dc:subject>" for genre in (genres or []))
+        + (f"<dc:subject>{'Completed' if status == 'Completed' else 'In-Progress'}</dc:subject>"
+           if status in ('Completed', 'Ongoing') else '') +
         f'<dc:identifier id="bookid">urn:uuid:{uuid.uuid5(uuid.NAMESPACE_URL, url)}</dc:identifier>'
         + ('<meta name="cover" content="cover-image"/>' if cover_name else '') +
         '</metadata><manifest><item id="toc" href="toc.ncx" '
@@ -386,6 +391,32 @@ def assemble(plan: dict, chunks_dir: Path, output_dir: Path) -> Path:
          if isinstance(value, str) and value.strip()),
         "",
     )
+    # Earlier chapter-batch metadata files omitted FanFicFare OPF subjects and
+    # descriptions. Recover them from the original batch EPUB without parsing
+    # chapter bodies or triggering any network request.
+    genres = next((clean_genres(value) for meta in titles
+                   for value in (meta.get("genres"), meta.get("tags"), meta.get("categories"))
+                   if clean_genres(value)), [])
+    status = next((meta["status"] for meta in titles
+                   if meta.get("status") in ("Completed", "Ongoing")), "")
+    for piece in plan["pieces"]:
+        if genres and description and status:
+            break
+        batch = chunks_dir / (
+            f"chapter-batch-{key}-{piece['start']:05d}-{piece['end']:05d}"
+        ) / "book" / "source.epub"
+        try:
+            source_metadata = read_source_metadata(batch)
+        except (OSError, ValueError, zipfile.BadZipFile, KeyError) as exc:
+            print(f"WARNING: Cannot read optional source EPUB metadata for "
+                  f"chapter batch {piece['start']}: {type(exc).__name__}", flush=True)
+            continue
+        if not genres:
+            genres = source_metadata.get("genres", [])
+        if not description:
+            description = source_metadata.get("description", "")
+        if not status:
+            status = source_metadata.get("status", "")
     if not description:
         print(
             "WARNING: No source synopsis is available in the downloaded "
@@ -414,12 +445,17 @@ def assemble(plan: dict, chunks_dir: Path, output_dir: Path) -> Path:
         print("WARNING: No cover image available in chapter batches.", flush=True)
     _epub(book, merged, title, author, language, url,
           description=description,
-          cover_path=(book / cover_name if cover_name else None))
+          cover_path=(book / cover_name if cover_name else None),
+          genres=genres, status=status)
     epub_metadata, from_epub = epub_chapters(book / "source.epub")
     if len(from_epub) != len(merged):
         raise ValueError("Combined EPUB does not contain every selected chapter")
     if description and epub_metadata.get("description") != description:
         raise ValueError("Combined EPUB lost its synopsis metadata")
+    if genres and epub_metadata.get("genres") != genres:
+        raise ValueError("Combined EPUB lost its source genres")
+    if status and epub_metadata.get("status") != status:
+        raise ValueError("Combined EPUB lost its publication status")
     if cover_name:
         from tools.novel_covers import extract_epub_cover
         extracted = extract_epub_cover(book / "source.epub")
@@ -435,6 +471,10 @@ def assemble(plan: dict, chunks_dir: Path, output_dir: Path) -> Path:
     if description:
         metadata["description"] = description
         metadata["synopsis"] = description
+    if genres:
+        metadata["genres"] = genres
+    if status:
+        metadata["status"] = status
     if cover_name:
         metadata["cover_image"] = cover_name
     (book / "metadata.json").write_text(json.dumps(metadata, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
