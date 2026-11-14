@@ -11,9 +11,10 @@ on:
           - All
           - NovelFull
           - FreeWebNovel
+          - Scribble Hub
         default: All
       novel_names:
-        description: 'Saved novel names separated by comma or semicolon (max 10)'
+        description: 'Saved novel names separated by comma or semicolon'
         required: false
         type: string
       novel_urls:
@@ -26,6 +27,11 @@ on:
         type: string
       force:
         description: 'Redownload even if an available archive exists'
+        required: false
+        type: boolean
+        default: false
+      confirm_rights:
+        description: 'Required for Scribble Hub: I have permission to archive these works'
         required: false
         type: boolean
         default: false
@@ -44,6 +50,8 @@ jobs:
       novelfull_matrix: ${{ steps.plan.outputs.novelfull_matrix }}
       has_freewebnovel: ${{ steps.plan.outputs.has_freewebnovel }}
       freewebnovel_matrix: ${{ steps.plan.outputs.freewebnovel_matrix }}
+      has_scribblehub: ${{ steps.plan.outputs.has_scribblehub }}
+      scribblehub_matrix: ${{ steps.plan.outputs.scribblehub_matrix }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
@@ -62,12 +70,22 @@ jobs:
           NOVEL_URLS: ${{ inputs.novel_urls }}
           CHAPTER_RANGE: ${{ inputs.chapter_range }}
           FORCE: ${{ inputs.force }}
+          CONFIRM_RIGHTS: ${{ inputs.confirm_rights }}
         run: |
           args=(python -m tools.library_bulk plan \
             --website "$WEBSITE" --names "$NOVEL_NAMES" --urls "$NOVEL_URLS" \
             --chapter-range "$CHAPTER_RANGE")
           if [[ "$FORCE" == "true" ]]; then args+=(--force); fi
+          if [[ "$CONFIRM_RIGHTS" == "true" ]]; then args+=(--confirm-rights); fi
           "${args[@]}"
+
+      - name: Preserve planned novel selection for partial recovery
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: bulk-selection-${{ github.run_id }}
+          path: library_bulk_plan.json
+          retention-days: 7
+          if-no-files-found: error
 
   novelfull:
     needs: prepare
@@ -103,16 +121,79 @@ jobs:
       pull-requests: write
       actions: read
 
+  scribblehub:
+    needs: prepare
+    if: needs.prepare.outputs.has_scribblehub == 'true'
+    strategy:
+      fail-fast: false
+      # FicHub asks for serial requests, not simultaneous export jobs.
+      max-parallel: 1
+      matrix: ${{ fromJSON(needs.prepare.outputs.scribblehub_matrix) }}
+    uses: ./.github/workflows/scribblehub-download.yml
+    with:
+      novel_url: ${{ matrix.novel_url }}
+      force: ${{ matrix.force }}
+      confirm_rights: ${{ inputs.confirm_rights }}
+    permissions:
+      contents: write
+      pull-requests: write
+      actions: read
+
   summary:
-    needs: [prepare, novelfull, freewebnovel]
+    needs: [prepare, novelfull, freewebnovel, scribblehub]
     if: always()
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout recovery validator
+        if: needs.prepare.result == 'success'
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: main
+
+      - name: Retrieve selected novel plan
+        if: needs.prepare.result == 'success'
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: bulk-selection-${{ github.run_id }}
+          path: saved_plan
+
+      - name: Collect successful per-novel artefacts even if other downloads failed
+        if: needs.prepare.result == 'success'
+        continue-on-error: true
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: novel-${{ github.run_id }}-*
+          path: collected_artifacts
+          merge-multiple: false
+
+      - name: Validate and package all completed novels separately
+        id: recovery
+        if: needs.prepare.result == 'success'
+        run: |
+          python -m tools.bulk_recovery \
+            --plan saved_plan/library_bulk_plan.json \
+            --artifacts collected_artifacts \
+            --output recovery_output \
+            --run-id "$GITHUB_RUN_ID"
+
+      - name: Publish successful-novels recovery bundle even when the bulk run failed
+        if: always() && needs.prepare.result == 'success'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: bulk-successful-novels-${{ github.run_id }}
+          path: recovery_output/
+          retention-days: 7
+          if-no-files-found: error
+          compression-level: 6
+
       - name: Summarise grouped website downloads
+        if: always()
         env:
           PREPARE: ${{ needs.prepare.result }}
           NOVELFULL: ${{ needs.novelfull.result }}
           FREEWEBNOVEL: ${{ needs.freewebnovel.result }}
+          SCRIBBLEHUB: ${{ needs.scribblehub.result }}
+          RECOVERY: ${{ steps.recovery.outcome }}
         run: |
           echo "## Grouped bulk result" >> "$GITHUB_STEP_SUMMARY"
           echo "| Group | Result |" >> "$GITHUB_STEP_SUMMARY"
@@ -120,10 +201,15 @@ jobs:
           echo "| Planning | $PREPARE |" >> "$GITHUB_STEP_SUMMARY"
           echo "| NovelFull | $NOVELFULL |" >> "$GITHUB_STEP_SUMMARY"
           echo "| FreeWebNovel | $FREEWEBNOVEL |" >> "$GITHUB_STEP_SUMMARY"
-          echo "Each completed novel has its own ZIP artifact and metadata-only registry update." >> "$GITHUB_STEP_SUMMARY"
+          echo "| Scribble Hub | $SCRIBBLEHUB |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Partial recovery | $RECOVERY |" >> "$GITHUB_STEP_SUMMARY"
+          echo "Independently completed novels retain their original individual artefacts." >> "$GITHUB_STEP_SUMMARY"
+          echo "The bulk-successful-novels-$GITHUB_RUN_ID recovery artefact contains one portable ZIP per recovered book and a manifest, including on partial failure." >> "$GITHUB_STEP_SUMMARY"
           if [[ "$PREPARE" == "failure" || "$PREPARE" == "cancelled" || \
                 "$NOVELFULL" == "failure" || "$NOVELFULL" == "cancelled" || \
-                "$FREEWEBNOVEL" == "failure" || "$FREEWEBNOVEL" == "cancelled" ]]; then
+                "$FREEWEBNOVEL" == "failure" || "$FREEWEBNOVEL" == "cancelled" || \
+                "$SCRIBBLEHUB" == "failure" || "$SCRIBBLEHUB" == "cancelled" || \
+                "$RECOVERY" == "failure" ]]; then
             echo "::error::At least one grouped download failed or was cancelled."
             exit 1
           fi

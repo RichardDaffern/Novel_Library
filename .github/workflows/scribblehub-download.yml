@@ -19,6 +19,22 @@ on:
         type: boolean
         default: false
 
+  workflow_call:
+    inputs:
+      novel_url:
+        description: 'Registered Scribble Hub series URL'
+        required: true
+        type: string
+      confirm_rights:
+        description: 'Explicit rights confirmation for the requested book'
+        required: true
+        type: boolean
+      force:
+        description: 'Redownload even if a completed artefact is available'
+        required: false
+        type: boolean
+        default: false
+
 permissions:
   contents: write
   pull-requests: write
