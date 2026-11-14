@@ -24,12 +24,11 @@ from tools.download_registry import (
 )
 
 def parse_novel_urls(raw: str, limit: int | None = None) -> list[str]:
-    """There is no application-level ten-novel cap.
+    """Parse and deduplicate HTTPS links with no artificial ten-novel cap.
 
-    A caller can supply an explicit limit when the execution platform needs
-    one; the GitHub matrix planner separately enforces GitHub's 256-job limit.
+    A caller may pass an optional explicit limit. The GitHub bulk planner
+    enforces the matrix-platform limit separately.
     """
-    """Parse whitespace/comma/semicolon-delimited HTTPS links and deduplicate."""
     items = re.split(r"[\s,;]+", raw.strip())
     urls: list[str] = []
     seen: set[str] = set()
