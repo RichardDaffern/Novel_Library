@@ -16,6 +16,7 @@ from tools.import_local_epub import (
 
 RR = "https://www.royalroad.com/fiction/21220/mother-of-learning"
 WTR = "https://wtr-lab.com/en/novel/6965/myriad-paths"
+SH = "https://www.scribblehub.com/series/2677327/blueflame-the-starless-king/"
 
 
 def fixture_epub(root: Path, cover: bool = True) -> Path:
@@ -109,6 +110,73 @@ class LocalEpubArchiveTests(unittest.TestCase):
                 self.assertEqual(metadata["chapter_count"], 2)
                 self.assertNotIn("cover_image", metadata)
                 self.assertEqual(metadata["source_url"], WTR)
+
+    def test_scribblehub_authorised_epub_import_with_cover_and_hashes(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            epub = fixture_epub(root)
+            before = epub.read_bytes()
+            with patch("socket.create_connection", side_effect=AssertionError("network forbidden")):
+                archive = import_epub_to_zip(
+                    epub, root / "output", SH, confirm_rights=True
+                )
+            self.assertEqual(before, epub.read_bytes(), "source EPUB must remain unchanged")
+            self.assertTrue(archive.name.startswith("novel-"))
+            with ZipFile(archive) as z:
+                self.assertIsNone(z.testzip())
+                folder = "test-original-novel/"
+                meta = json.loads(z.read(folder + "metadata.json"))
+                rows = json.loads(z.read(folder + "chapters.json"))
+                self.assertEqual(meta["source_url"], SH)
+                self.assertEqual(meta["chapter_count"], 2)
+                self.assertEqual(meta["cover_image"], "cover.png")
+                self.assertEqual([row["position"] for row in rows], [1, 2])
+                for row in rows:
+                    data = z.read(folder + row["file"])
+                    self.assertEqual(sha256(data).hexdigest(), row["sha256"])
+
+    def test_scribblehub_url_validation_rejects_nonbook_and_unsafe_forms(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            epub = fixture_epub(root)
+            invalid = (
+                "http://www.scribblehub.com/series/2677327/title/",
+                SH + "?query=1",
+                SH + "#chapter",
+                "https://evil.scribblehub.com/series/2677327/title/",
+                "https://www.scribblehub.com.evil.com/series/2677327/title/",
+                "https://user:password@www.scribblehub.com/series/2677327/title/",
+                "https://www.scribblehub.com:8443/series/2677327/title/",
+                "https://www.scribblehub.com/read/2677327-title/chapter/12345/",
+                "https://www.scribblehub.com/series/2677327/title/chapter/12345/",
+                "https://www.scribblehub.com/series/not-a-number/title/",
+                "https://www.scribblehub.com/",
+            )
+            for source_url in invalid:
+                with self.subTest(url=source_url), self.assertRaises(LocalImportError):
+                    import_epub_to_zip(epub, root / "output", source_url, confirm_rights=True)
+            self.assertFalse((root / "output").exists())
+
+    def test_scribblehub_numeric_series_identity_survives_title_slug_change(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            epub = fixture_epub(root, cover=False)
+            old_zip = import_epub_to_zip(epub, root / "output", SH, confirm_rights=True)
+            new_url = "https://scribblehub.com/series/2677327/renamed-story/"
+            with self.assertRaisesRegex(LocalImportError, "already exists"):
+                import_epub_to_zip(epub, root / "output", new_url, confirm_rights=True)
+            replaced = import_epub_to_zip(
+                epub, root / "output", new_url,
+                confirm_rights=True, replace=True
+            )
+            self.assertEqual(old_zip, replaced)
+            with ZipFile(replaced) as archive:
+                meta = json.loads(archive.read("test-original-novel/metadata.json"))
+                self.assertEqual(
+                    meta["source_url"],
+                    "https://www.scribblehub.com/series/2677327/renamed-story/",
+                )
+                self.assertIsNone(archive.testzip())
 
     def test_no_permission_cannot_create_archive_or_modify_source(self):
         with TemporaryDirectory() as tmp:

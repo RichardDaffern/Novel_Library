@@ -3,7 +3,8 @@
 
 This tool never makes network requests. It is useful for author-provided EPUBs
 (including Royal Road's author EPUB export) or other EPUBs you are permitted
-to save. WTR-Lab's website does NOT itself authorise downloading novels.
+to save. It supports Scribble Hub EPUB provenance but never downloads from
+Scribble Hub. WTR-Lab's website does NOT itself authorise downloading novels.
 """
 from __future__ import annotations
 
@@ -11,10 +12,12 @@ import argparse
 import hashlib
 import json
 import os
+import re
 from pathlib import Path
 import shutil
 import sys
 import tempfile
+from urllib.parse import urlsplit
 from zipfile import ZipFile, BadZipFile, ZIP_DEFLATED
 
 from novel_downloader import epub_chapters, export_epub, slugify
@@ -58,23 +61,64 @@ def inspect_local_epub(path: Path) -> tuple[dict, int]:
     return metadata, len(chapters)
 
 
+def _import_source_url(source_url: str) -> tuple[str, str]:
+    """Validate offline-import provenance; never fetch the supplied website.
+
+    Scribble Hub is intentionally accepted ONLY here, not in the live website
+    downloader or the saved-HTML feasibility parser. Its numeric series ID
+    remains stable even when the series slug changes.
+    """
+    try:
+        return validate_book_url(source_url)
+    except SourceProbeError as original:
+        try:
+            parts = urlsplit(source_url.strip())
+            port = parts.port
+        except (AttributeError, ValueError) as exc:
+            raise LocalImportError("Invalid source URL") from exc
+        if (parts.hostname or "").lower() not in ("scribblehub.com", "www.scribblehub.com"):
+            raise LocalImportError(str(original)) from original
+        if (parts.scheme != "https" or parts.username or parts.password
+                or port is not None or parts.query or parts.fragment):
+            raise LocalImportError(
+                "Scribble Hub source must be an HTTPS series URL without credentials, "
+                "ports, query parameters or fragments"
+            )
+        match = re.fullmatch(
+            r"/series/([1-9][0-9]{0,14})(?:/([a-z0-9][a-z0-9-]{0,199}))?/?",
+            parts.path,
+        )
+        if not match:
+            raise LocalImportError(
+                "Expected a Scribble Hub /series/<id>/<slug>/ URL, not a chapter or homepage"
+            )
+        series_id, slug = match.groups()
+        canonical = f"https://www.scribblehub.com/series/{series_id}/"
+        if slug:
+            canonical += slug + "/"
+        return "ScribbleHub", canonical
+
+
 def import_epub_to_zip(epub: Path, output_dir: Path, source_url: str, *,
                        confirm_rights: bool = False, replace: bool = False) -> Path:
     if not confirm_rights:
         raise LocalImportError("Confirm that you are permitted to archive this EPUB")
-    try:
-        site, canonical_url = validate_book_url(source_url)
-    except SourceProbeError as exc:
-        raise LocalImportError(str(exc)) from exc
-    if site not in ("WTRLab", "RoyalRoad"):
-        raise LocalImportError("Only WTR-Lab and Royal Road source URLs are accepted here")
+    site, canonical_url = _import_source_url(source_url)
+    if site not in ("WTRLab", "RoyalRoad", "ScribbleHub"):
+        raise LocalImportError("Only WTR-Lab, Royal Road and Scribble Hub source URLs are accepted here")
     epub = Path(epub)
     metadata, chapter_count = inspect_local_epub(epub)
     title = str(metadata["title"]).strip()
     book_slug = slugify(title)
     if not book_slug or book_slug in (".", ".."):
         raise LocalImportError("EPUB has an invalid title for folder naming")
-    identity = hashlib.sha256(canonical_url.encode("utf-8")).hexdigest()[:12]
+    # For Scribble Hub, distinguish immutable numeric identity from the
+    # human-readable slug so an author title change cannot fork the ZIP name.
+    identity_source = canonical_url
+    if site == "ScribbleHub":
+        series_id = re.match(r"https://www[.]scribblehub[.]com/series/([0-9]+)/", canonical_url).group(1)
+        identity_source = f"https://www.scribblehub.com/series/{series_id}/"
+    identity = hashlib.sha256(identity_source.encode("utf-8")).hexdigest()[:12]
     output_dir = Path(output_dir)
     output = output_dir / f"novel-{identity}.zip"
     if output.exists() and not replace:
@@ -167,7 +211,7 @@ def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--epub", type=Path, required=True)
     parser.add_argument("--source-url", required=True,
-                        help="Royal Road /fiction/... or WTR-Lab /en/novel/... URL")
+                        help="Royal Road /fiction/..., WTR-Lab /en/novel/... or Scribble Hub /series/... source URL")
     parser.add_argument("--output-dir", type=Path, default=Path("Imported_Novels"))
     parser.add_argument("--confirm-rights", action="store_true")
     parser.add_argument("--replace", action="store_true",
