@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "scribblehub": {
+    "445037": {
+      "title": "The Adventurous Gamer Ninja - Daichi Hekima",
+      "author": "MonkWithAPen",
+      "fanfiction_url": "https://www.fanfiction.net/s/14031894/1/The-Adventurous-Gamer-Ninja-Daichi-Hekima",
+      "minimum_chapters": 432,
+      "front_matter": [
+        "Introduction",
+        "The Adventurous Gamer Ninja - Daichi Hekima"
+      ],
+      "first_chapter_title": "My Second Chance",
+      "chapter_checkpoints": [
+        {
+          "position": 432,
+          "title": "Orochimaru's Contingency"
+        }
+      ]
+    }
+  }
+}
