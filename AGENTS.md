@@ -375,18 +375,20 @@ This example makes live source requests. **Do not use it in deterministic CI or 
 
 `.github/workflows/library-bulk-download.yml` is named **Library - Bulk Download** and is the single user-facing bulk workflow.
 
-The user chooses **All**, **NovelFull** or **FreeWebNovel**, and enters one or more saved novel names or exact source URLs. The input may combine names and URLs. A chapter range can optionally apply to the selection, and `force` bypasses an available-artifact skip.
+The user chooses **All**, **NovelFull**, **FreeWebNovel** or **Scribble Hub**, and enters one or more saved novel names or exact source URLs. The input may combine names and URLs. A chapter range can optionally apply to the selection, and `force` bypasses an available-artifact skip.
 
 Implementation is in `tools/library_bulk.py`:
 
 - Resolve names from the downloaded registry and `novel_sources.json`.
 - Reject unknown or ambiguous names rather than guessing which book is meant.
 - Validate each URL's source site, path and the selected website filter.
-- Limit a submission to **10 distinct novels**.
+- No arbitrary ten-novel limit. Respect the GitHub Actions **256-job matrix limit** for scheduled (non-skipped) downloads; fail with an informative message rather than letting GitHub silently reject an oversized matrix.
 - Check available completed artefacts and skip them by default.
-- Group requested work by site; call existing **NovelFull - Download** and **FreeWebNovel - Download** reusable workflows.
-- Limit simultaneous novels to at most **three NovelFull** and **two FreeWebNovel** jobs.
+- Group requested work by site; call existing **NovelFull - Download**, **FreeWebNovel - Download** and the **verified Scribble Hub - Download** reusable workflows. Scribble Hub's `workflow_call` requires explicit `confirm_rights` and only allowlisted same-author cross-posts; only full-book exports are supported.
+- Limit simultaneous novels to at most **three NovelFull**, **two FreeWebNovel** and **one Scribble Hub** jobs.
 - Preserve each child's own chapter batch limits and per-book validation.
+- After **all** children finish, the summary job runs under `if: always()` and retrieves every successful `novel-<run-id>-*` artefact, even when the parent run is red. `tools/bulk_recovery.py` validates source identity, EPUB ZIP CRC, manifest ordering and each TXT SHA-256 before packaging one portable ZIP per complete novel into a seven-day `bulk-successful-novels-<run-id>` recovery artefact, plus a JSON manifest of missing/rejected downloads.
+- Never delete independently uploaded successful child artefacts when any other book, registry update or recovery job fails. The overall bulk workflow must still signal failures, without losing verified successes. Recovery has an intentional 1.75 GiB aggregate size safety limit; original child artefacts persist if exceeded.
 
 Do not create another bulk UI just because a source adds a new adapter. Extend the single planner and dispatch model only after that site's legal, technical and testing requirements are met.
 
@@ -644,7 +646,7 @@ Different sites have different technical and permission restrictions. A parser e
 - FicHub's API is unstable and may be temporarily rate-limited or stale. Use a custom project User-Agent with contact; perform at most one export request plus one ebook request per operation; **no concurrent calls or automatic retries**. Do not expose or commit story text or upload the ebook into a public CI artefact.
 - Tests in `tests/test_verified_crosspost_download.py` and `tests/test_verified_crosspost_artifact.py` use wholly synthetic EPUB fixtures and injected fake HTTP clients; they cover provenance, chapter completeness, front-matter exclusion, bad URL handling, rights, failed requests and rollback. Keep NovelFull and FreeWebNovel regressions green.
 
-This route does **not** mean Scribble Hub's direct HTTPS chapter requests can be automated reliably. Unknown series IDs must fail with a clear explanation until another same-author cross-post is independently verified and registered.
+This route is also reused by the unified bulk workflow for authorised, registered cross-posts. It does **not** mean Scribble Hub's direct HTTPS chapter requests can be automated reliably. Unknown series IDs must fail with a clear explanation until another same-author cross-post is independently verified and registered.
 
 ### WebNovel modules
 
@@ -681,8 +683,9 @@ Before writing any live downloader:
 | `.github/workflows/pdf-conversion-ci.yml` | Relevant PR/push paths and manual dispatch | Ubuntu + Windows Python 3.12 PDF tests | Offline synthetic outputs |
 | `.github/workflows/download-novel.yml` | Manual and reusable call | Prepare, bounded chapter batches, assemble, report | Temporary book artefacts and metadata registry PR |
 | `.github/workflows/freewebnovel-download.yml` | Manual and reusable call | Prepare, bounded chapter batches, assemble, report | Temporary book artefacts and metadata registry PR |
+| `.github/workflows/scribblehub-download.yml` | Manual and reusable call | Explicit rights gate, verified same-author FicHub cross-post, archive verification | Temporary complete novel artefact and metadata-only registry PR |
 | `.github/workflows/scribblehub-download.yml` | Manual only | Verify rights and registered author cross-post, FicHub export, ZIP validation, artefact assembly and metadata registry | Seven-day complete-novel artefact and metadata-only registry PR; only allowlisted same-author cross-posts |
-| `.github/workflows/library-bulk-download.yml` | Manual | Resolve selections, site-specific reusable workflows, summary | Delegates to site workflows |
+| `.github/workflows/library-bulk-download.yml` | Manual | Resolve selections, three site-specific reusable workflows, always-run recovery summary | Delegates to site workflows; publishes an additional partial-success recovery artefact even if other jobs fail |
 | `.github/workflows/download-covers.yml` | Manual | Cover-only job | 30-day cover-image artefact; no chapter or registry edits |
 
 Security/operational expectations:
@@ -694,7 +697,7 @@ Security/operational expectations:
 - Keep source URLs in environment variables or correctly quoted argument vectors. Do not use `shell=True` for downloader processes.
 - Keep chapter content out of commit diffs, summaries and debug logs. Book artefacts can be accessible to other users of a public GitHub repo.
 - No secrets or PATs should be embedded in tracked files; GitHub workflows use their available temporary token where authorised.
-- When changing a reusable workflow, test both invocation paths: manual dispatch **and** Library - Bulk Download. Scribble Hub is deliberately manual-only and must not be added to the existing bulk menu without separate verification.
+- When changing a reusable workflow, test both invocation paths: manual dispatch **and** Library - Bulk Download. Scribble Hub is now available through the single bulk menu only for explicitly verified same-author cross-posts with rights confirmation; no general Scribble Hub site scraping or unrestricted bulk coverage is implied.
 - Do not remove mandatory CI jobs just because an intermittent live-site request is unavailable.
 - External metadata-only NovelFull checks are **non-blocking** by design. Offline fixtures are the release gate.
 

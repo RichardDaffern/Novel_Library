@@ -23,11 +23,12 @@ from tools.download_registry import (
     read_registry, record_download, write_registry,
 )
 
-MAX_NOVELS = 10
+def parse_novel_urls(raw: str, limit: int | None = None) -> list[str]:
+    """Parse and deduplicate HTTPS links with no artificial ten-novel cap.
 
-
-def parse_novel_urls(raw: str, limit: int = MAX_NOVELS) -> list[str]:
-    """Parse whitespace/comma/semicolon-delimited HTTPS links and deduplicate."""
+    A caller may pass an optional explicit limit. The GitHub bulk planner
+    enforces the matrix-platform limit separately.
+    """
     items = re.split(r"[\s,;]+", raw.strip())
     urls: list[str] = []
     seen: set[str] = set()
@@ -38,7 +39,7 @@ def parse_novel_urls(raw: str, limit: int = MAX_NOVELS) -> list[str]:
         if url not in seen:
             seen.add(url)
             urls.append(url)
-        if len(urls) > limit:
+        if limit is not None and len(urls) > limit:
             raise ValueError(f"Maximum {limit} distinct novel URLs per batch")
     if not urls:
         raise ValueError("Enter at least one novel URL")

@@ -77,8 +77,10 @@ class TestScribbleHubOffline(unittest.TestCase):
         self.assertEqual(re.match(pattern, CHAPTER).group("id"), "2677327")
         self.assertEqual(validate_url(SERIES), SERIES)
 
-    def test_bulk_planner_does_not_accidentally_enable_scribble_hub(self):
-        with self.assertRaisesRegex(ValueError, "Unsupported website"):
+    def test_bulk_planner_rejects_unregistered_scribble_hub_work(self):
+        # The adapter can parse public site HTML, but the bulk planner
+        # permits only verified same-author cross-posts, not this series.
+        with self.assertRaisesRegex(ValueError, "No author-verified"):
             _validated_url(SERIES)
 
     def test_synthetic_series_and_ajax_index_are_parsed_offline(self):

@@ -94,7 +94,7 @@ For automatic PR creation and merging, the repository owner must enable **Settin
 
 ## FreeWebNovel - Download
 
-The dedicated FreeWebNovel workflow handles a single novel; the unified bulk workflow handles multiple titles from the two download-capable sources. This is **not** the NovelFull FanFicFare adapter. Its Actions workflow splits work into normally 50-chapter batches, accepts only publicly readable chapters, verifies chapter content and positions, and does not bypass access challenges.
+The dedicated FreeWebNovel workflow handles a single novel; the unified bulk workflow handles multiple titles from NovelFull, FreeWebNovel and explicitly verified Scribble Hub author cross-posts. This is **not** the NovelFull FanFicFare adapter. Its Actions workflow splits work into normally 50-chapter batches, accepts only publicly readable chapters, verifies chapter content and positions, and does not bypass access challenges.
 
 Read the full [FreeWebNovel capability and limitations](WEBSITE_SUPPORT.md#freewebnovel) before running it.
 
@@ -102,12 +102,11 @@ Read the full [FreeWebNovel capability and limitations](WEBSITE_SUPPORT.md#freew
 ## GitHub Actions: Library - Bulk Download
 
 Use **Actions > Library - Bulk Download > Run workflow** for downloads from
-both supported websites. **This is the only bulk workflow**; choose the website
-in its dropdown (All, NovelFull or FreeWebNovel). Separate site-specific
-bulk menus are redundant and have been removed. The workflow groups download jobs by website,
-without changing the individual site-specific downloaders.
+NovelFull, FreeWebNovel and verified Scribble Hub author cross-posts. **This is the only bulk workflow**; choose All or a specific website from the dropdown. Separate site-specific
+bulk menus are unnecessary. The workflow groups download jobs by website,
+without changing the existing site-specific downloaders.
 
-- **Website group:** All, NovelFull or FreeWebNovel.
+- **Website group:** All, NovelFull, FreeWebNovel or Scribble Hub.
 - **Saved novel names:** Type names listed in
   [DOWNLOADED_NOVELS.md](../DOWNLOADED_NOVELS.md), separated by commas or
   semicolons. Example: `The World Online; The First Order`. Use semicolons
@@ -116,6 +115,7 @@ without changing the individual site-specific downloaders.
   recorded. Names and URLs can be mixed.
 - **Chapter range:** Optional; blank requests a whole novel.
 - **Force:** Redownload even if a completed artifact is still available.
+- **Confirm rights:** Required when the selection includes Scribble Hub. Only registered, same-author cross-posts are supported; other Scribble Hub series are rejected. For these books, chapter range must be blank because only whole-novel exports are verified.
 
 GitHub Actions lacks a dynamic multi-select field, so saved names are entered
 as multi-value text rather than selected with checkboxes. Example: select
@@ -132,12 +132,34 @@ the tested FreeWebNovel example. For a brand-new title, enter its exact URL;
 after a successful download and registry update, that title is available by
 name. You can also add a title/URL to the curated JSON list beforehand.
 
-Unknown or ambiguous titles, URLs from an unsupported or mismatched site,
-and more than **10 distinct novels** are rejected before any downloading.
-Already-available books are skipped unless Force is selected. Up to three
-NovelFull books and two FreeWebNovel books can run concurrently; the source
-downloaders still enforce their own chapter limits. Each book produces its
-own ZIP artifact, with metadata-only registry updates for completed books.
+Unknown or ambiguous titles, URLs from unsupported or mismatched sites, and
+Scribble Hub series without an explicitly verified author cross-post are
+rejected before downloading. The artificial **ten-novel cap is removed**.
+GitHub Actions currently permits at most **256 matrix jobs per workflow run**;
+the planner rejects a larger scheduled selection with an explicit explanation,
+so split it over separate runs. Cached/skipped novels do not count towards
+scheduled jobs. Up to three NovelFull books, two FreeWebNovel books and one
+Scribble Hub cross-post can run concurrently. Existing per-book chapter
+validation and registered download status checks remain unchanged.
+
+**Partial-failure recovery:** each successfully completed book has its own
+separately downloadable novel artefact, even if another book fails or the
+overall bulk workflow status is red. The always-run summary job additionally
+downloads the completed child artefacts, re-verifies source URLs, ZIP/EPUB CRC,
+chapter positions, manifest and individual SHA-256 digests, then publishes
+`bulk-successful-novels-<run-id>` under the bulk run's **Artifacts** section.
+Download that recovery artefact and extract it to obtain **one ordinary ZIP per
+successful novel**, plus `bulk_recovery_manifest.json` showing recovered,
+missing and rejected books. A failed/incomplete chapter batch is never included
+as a completed novel. Original independent completed artefacts are not deleted
+during recovery, and remain available if recovery packaging itself fails.
+
+The recovery bundle and individual novel artefacts are retained for seven days.
+A large recovery bundle is bounded by a 1.75 GiB packaging safety limit; books
+not included because of this limit remain individually retrievable.
+Public-repository Actions artefacts may be accessible to other users.
+The bulk job remains failed when a child fails, making the failure visible
+without sacrificing any verified successes.
 
 `DOWNLOADED_NOVELS.md` is grouped by website automatically. Historical
 downloads retain all their artifact links and chapter counts, including

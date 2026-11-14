@@ -14,6 +14,7 @@ from tools.library_bulk import (
 NOVELFULL = "https://novelfull.com/the-world-online.html"
 COMMA = "https://novelfull.com/please-i-really-didnt-want-to-fall-in-love-with-my-master.html"
 FREE = "https://freewebnovel.com/novel/the-first-order"
+SCRIBBLE = "https://www.scribblehub.com/series/445037/the-adventurous-gamer-ninja--daichi-hekima/"
 
 
 def sample_registry():
@@ -136,6 +137,61 @@ class LibraryBulkTests(unittest.TestCase):
             selection_plan(sample_registry(), CURATED, "", "", "All")
         with self.assertRaisesRegex(ValueError, "range"):
             selection_plan(sample_registry(), CURATED, "The First Order", "", "All", "3-1")
+
+    def test_over_ten_novels_allowed_and_platform_limit_explained(self):
+        urls = " ".join(
+            f"https://novelfull.com/novel-{n}.html" for n in range(30)
+        )
+        plan = selection_plan(sample_registry(), CURATED, "", urls, "NovelFull")
+        self.assertEqual(plan["selected_count"], 30)
+        self.assertEqual(len(plan["groups"]["NovelFull"]), 30)
+        very_large = " ".join(
+            f"https://novelfull.com/novel-{n}.html" for n in range(257)
+        )
+        with self.assertRaisesRegex(ValueError, "256 matrix jobs"):
+            selection_plan(sample_registry(), CURATED, "", very_large, "NovelFull")
+
+    def test_scribblehub_crosspost_bulk_requires_rights_and_full_book(self):
+        with self.assertRaisesRegex(ValueError, "permission"):
+            selection_plan(sample_registry(), CURATED, "", SCRIBBLE, "All")
+        with self.assertRaisesRegex(ValueError, "full novels only"):
+            selection_plan(
+                sample_registry(), CURATED, "", SCRIBBLE, "All",
+                "1-2", confirm_rights=True,
+            )
+        plan = selection_plan(
+            sample_registry(), CURATED, "", SCRIBBLE, "All",
+            confirm_rights=True, force=True,
+        )
+        self.assertEqual(plan["selected_count"], 1)
+        self.assertEqual(plan["groups"]["Scribble Hub"][0]["novel_url"], SCRIBBLE)
+        self.assertEqual(plan["groups"]["Scribble Hub"][0]["chapter_range"], "")
+        self.assertTrue(plan["groups"]["Scribble Hub"][0]["force"])
+        with self.assertRaisesRegex(ValueError, "No author-verified"):
+            selection_plan(
+                sample_registry(), CURATED, "",
+                "https://www.scribblehub.com/series/999999/unregistered/",
+                "All", confirm_rights=True,
+            )
+
+    def test_scribblehub_group_and_cli_output(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            reg = root / "downloaded.json"
+            cat = root / "sources.json"
+            report = root / "output.txt"
+            reg.write_text(json.dumps(sample_registry()), encoding="utf-8")
+            cat.write_text(json.dumps(CURATED), encoding="utf-8")
+            with patch.dict(os.environ, {"GITHUB_OUTPUT": str(report)}):
+                self.assertEqual(main([
+                    "plan", "--registry", str(reg), "--catalogue", str(cat),
+                    "--urls", SCRIBBLE, "--confirm-rights",
+                    "--plan-file", str(root / "plan.json"),
+                ]), 0)
+            values = dict(line.split("=", 1) for line in report.read_text().splitlines())
+            self.assertEqual(values["has_scribblehub"], "true")
+            row = json.loads(values["scribblehub_matrix"])["include"][0]
+            self.assertEqual(row["novel_url"], SCRIBBLE)
 
     def test_cli_outputs_matrices_and_no_live_requests(self):
         with TemporaryDirectory() as tmp:

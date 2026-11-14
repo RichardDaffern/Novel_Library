@@ -41,6 +41,12 @@ class BulkDownloadTests(unittest.TestCase):
             with self.subTest(bad=bad), self.assertRaises(ValueError):
                 parse_novel_urls(bad)
 
+    def test_no_default_ten_novel_limit(self):
+        urls = " ".join(f"https://example.org/novel-{n}.html" for n in range(25))
+        self.assertEqual(len(parse_novel_urls(urls)), 25)
+        plan = create_plan({"version": 1, "novels": []}, urls)
+        self.assertEqual(len(plan["planned"]), 25)
+
     def test_duplicate_registry_checked_before_download(self):
         plan = create_plan(registry_with_download(), f"{URL1}\n{URL2}")
         self.assertEqual(len(plan["planned"]), 1)
