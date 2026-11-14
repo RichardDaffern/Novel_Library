@@ -101,7 +101,7 @@ class BulkRecoveryTests(unittest.TestCase):
             self.assertEqual(len(report["rejected_artifacts"]), 1)
             self.assertEqual(len(list((root / "out").glob("novel-*.zip"))), 1)
             self.assertEqual({x["url"] for x in report["missing_or_failed"]},
-                             {SCRIBBLE, FREEWEBNOVEL})
+                             {SCRIBBLE.rstrip("/"), FREEWEBNOVEL})
 
     def test_unknown_artifact_and_unrecognised_run_id_are_not_published(self):
         with TemporaryDirectory() as temp:
