@@ -15,7 +15,7 @@ Other sources have restricted or specialised options, not general-purpose websit
 
 | Website | Current capability |
 | --- | --- |
-| [Scribble Hub](https://www.scribblehub.com/) | **One verified author cross-post** (series `445037`) can be fetched automatically via FicHub; other series require offline EPUB import or separate verification. Direct Scribble Hub requests remain blocked |
+| [Scribble Hub](https://www.scribblehub.com/) | **Scribble Hub - Download** Action for one verified author cross-post (series `445037`), via FicHub; other books need separate verification. Direct Scribble Hub requests remain blocked |
 | [WebNovel](https://www.webnovel.com/) | Limited public-page tests and offline import of chapters you have saved with permission; no full website downloader |
 | [Royal Road](https://www.royalroad.com/) | Offline conversion of an already-authorised local EPUB; no enabled site-download workflow |
 | [WTR-Lab](https://wtr-lab.com/) | Offline conversion of an already-authorised local EPUB; no enabled site-download workflow |
@@ -30,6 +30,7 @@ Go to [Actions](https://github.com/RichardDaffern/Novel_Library/actions) and run
 
 - **NovelFull - Download**: download a single NovelFull book.
 - **FreeWebNovel - Download**: download a single FreeWebNovel book.
+- **Scribble Hub - Download**: download the verified same-author FanFiction.net cross-post of Scribble Hub series `445037` via FicHub; confirm rights before running.
 - **Library - Bulk Download**: the **only bulk workflow**, supporting both sites. Select All, NovelFull or FreeWebNovel; enter saved novel names or source URLs. Up to 10 distinct titles per submission.
 - **Covers - Download**: download **images only**, not chapter text.
 
@@ -57,7 +58,9 @@ Use a real supported book URL in place of the illustrative URL. For verified ful
 
 ## Download the verified Scribble Hub cross-post
 
-For the author's *The Adventurous Gamer Ninja - Daichi Hekima* (series `445037`), there is an internet-based **FicHub + FanFiction.net author-cross-post** route; no pre-existing EPUB is needed:
+For the author's *The Adventurous Gamer Ninja - Daichi Hekima* (series `445037`), use **[Actions > Scribble Hub - Download](https://github.com/RichardDaffern/Novel_Library/actions/workflows/scribblehub-download.yml)**. Paste the series URL, check the authorisation box, and click **Run workflow**. The Action produces the same single-novel ZIP structure and registry entry as NovelFull, retrievable through `Download-All-Novels.cmd`. No local EPUB is needed.
+
+The equivalent local command is:
 
 ~~~powershell
 python -m tools.verified_crosspost_download "https://www.scribblehub.com/series/445037/the-adventurous-gamer-ninja--daichi-hekima/" --confirm-rights

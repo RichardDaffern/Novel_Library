@@ -637,11 +637,12 @@ Different sites have different technical and permission restrictions. A parser e
 
 - The user provides the original Scribble Hub **series** URL and `--confirm-rights`; no local EPUB is required. The command is `python -m tools.verified_crosspost_download "<scribble-hub-series-url>" --confirm-rights`.
 - `tools/verified_crossposts.json` is an explicit author cross-post allowlist. Currently it contains only Scribble Hub series `445037`, by MonkWithAPen, cross-posted by the same author as FanFiction.net story `14031894`. **Never** infer the mirror for an unrelated series simply from a similar title.
+- The dedicated manual [`.github/workflows/scribblehub-download.yml`](.github/workflows/scribblehub-download.yml) uses the validated cross-post CLI and `tools/verified_crosspost_artifact.py` to convert the validated ZIP to the **standard** book folder before `upload-artifact`. It runs the existing registry check and `tools.publish_registry`, and avoids publishing a nested ZIP. It has a mandatory authorisation checkbox and rejects unregistered novel IDs. Artefacts on public repositories may be publicly accessible.
 - The downloader calls FicHub's documented `/api/v0/epub` and its same-host EPUB cache, **not** Scribble Hub's pages or the protected chapter AJAX endpoint. Source URL validation, story author/title/FFN numeric ID, reported count, first-chapter title and a numbered checkpoint are fail-closed.
 - The 14 November 2026 remote test found **432** author-posted story chapters and a FicHub EPUB containing **two non-story introductory sections plus 432 actual chapters**. The code excludes only the two registered front sections when the verified first story chapter follows. If this structure or count changes unexpectedly, stop rather than silently shift chapters.
 - Preserve cover and EPUB description if present, reconstruct a clean EPUB with exactly the story chapters, and call the **existing** `import_epub_to_zip` to stage and verify chapter SHA-256, EPUB integrity, ZIP CRC, metadata and stable Scribble numeric-ID identity. The command publishes to `Downloaded_Novels/` and requires `--replace` for updating an existing ZIP.
 - FicHub's API is unstable and may be temporarily rate-limited or stale. Use a custom project User-Agent with contact; perform at most one export request plus one ebook request per operation; **no concurrent calls or automatic retries**. Do not expose or commit story text or upload the ebook into a public CI artefact.
-- Tests in `tests/test_verified_crosspost_download.py` use wholly synthetic EPUB fixtures and injected fake HTTP clients; they cover provenance, chapter completeness, front-matter exclusion, bad URL handling, rights, failed requests and rollback. Keep NovelFull and FreeWebNovel regressions green.
+- Tests in `tests/test_verified_crosspost_download.py` and `tests/test_verified_crosspost_artifact.py` use wholly synthetic EPUB fixtures and injected fake HTTP clients; they cover provenance, chapter completeness, front-matter exclusion, bad URL handling, rights, failed requests and rollback. Keep NovelFull and FreeWebNovel regressions green.
 
 This route does **not** mean Scribble Hub's direct HTTPS chapter requests can be automated reliably. Unknown series IDs must fail with a clear explanation until another same-author cross-post is independently verified and registered.
 
@@ -680,6 +681,7 @@ Before writing any live downloader:
 | `.github/workflows/pdf-conversion-ci.yml` | Relevant PR/push paths and manual dispatch | Ubuntu + Windows Python 3.12 PDF tests | Offline synthetic outputs |
 | `.github/workflows/download-novel.yml` | Manual and reusable call | Prepare, bounded chapter batches, assemble, report | Temporary book artefacts and metadata registry PR |
 | `.github/workflows/freewebnovel-download.yml` | Manual and reusable call | Prepare, bounded chapter batches, assemble, report | Temporary book artefacts and metadata registry PR |
+| `.github/workflows/scribblehub-download.yml` | Manual only | Verify rights and registered author cross-post, FicHub export, ZIP validation, artefact assembly and metadata registry | Seven-day complete-novel artefact and metadata-only registry PR; only allowlisted same-author cross-posts |
 | `.github/workflows/library-bulk-download.yml` | Manual | Resolve selections, site-specific reusable workflows, summary | Delegates to site workflows |
 | `.github/workflows/download-covers.yml` | Manual | Cover-only job | 30-day cover-image artefact; no chapter or registry edits |
 
@@ -692,7 +694,7 @@ Security/operational expectations:
 - Keep source URLs in environment variables or correctly quoted argument vectors. Do not use `shell=True` for downloader processes.
 - Keep chapter content out of commit diffs, summaries and debug logs. Book artefacts can be accessible to other users of a public GitHub repo.
 - No secrets or PATs should be embedded in tracked files; GitHub workflows use their available temporary token where authorised.
-- When changing workflows, test both invocation paths: manual dispatch **and** reusable invocation from Library - Bulk Download.
+- When changing a reusable workflow, test both invocation paths: manual dispatch **and** Library - Bulk Download. Scribble Hub is deliberately manual-only and must not be added to the existing bulk menu without separate verification.
 - Do not remove mandatory CI jobs just because an intermittent live-site request is unavailable.
 - External metadata-only NovelFull checks are **non-blocking** by design. Offline fixtures are the release gate.
 
