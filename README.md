@@ -15,7 +15,7 @@ Other investigated sources are **not** full-book download options:
 
 | Website | Current capability |
 | --- | --- |
-| [Scribble Hub](https://www.scribblehub.com/) | FanFicFare adapter exists, but the 14 November 2026 GitHub Actions metadata test received HTTP 403; no supported download workflow |
+| [Scribble Hub](https://www.scribblehub.com/) | Offline import of an authorised EPUB into a validated ZIP; live metadata access returned HTTP 403, so no website-download workflow |
 | [WebNovel](https://www.webnovel.com/) | Limited public-page tests and offline import of chapters you have saved with permission; no full website downloader |
 | [Royal Road](https://www.royalroad.com/) | Offline conversion of an already-authorised local EPUB; no enabled site-download workflow |
 | [WTR-Lab](https://wtr-lab.com/) | Offline conversion of an already-authorised local EPUB; no enabled site-download workflow |
@@ -70,7 +70,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\download_all_art
 ## Import existing books and maintain metadata
 
 - **PDF to novel ZIP:** put authorised, selectable-text PDFs in `PDF-to-Novel/PDFs/` and run [Convert-PDFs.cmd](PDF-to-Novel/Convert-PDFs.cmd). See [PDF converter instructions](docs/PDF_TO_NOVEL.md).
-- **Local EPUB to novel ZIP:** use `python -m tools.import_local_epub` on an EPUB you are permitted to archive. See [website/import capabilities](docs/WEBSITE_SUPPORT.md#royal-road-and-wtr-lab).
+- **Local EPUB to novel ZIP:** use `python -m tools.import_local_epub` for an authorised EPUB from Royal Road, WTR-Lab or Scribble Hub. See [website/import capabilities](docs/WEBSITE_SUPPORT.md#scribble-hub).
 - **Covers and synopsis repairs:** see [metadata and archive maintenance](docs/METADATA_GUIDE.md).
 
 A complete book normally contains `source.epub`, `metadata.json`, `chapters.json`, `chapter_*.txt` and an optional cover. [DOWNLOADED_NOVELS.md](DOWNLOADED_NOVELS.md) lists completed historical downloads, but its links are **not permanent storage**.
