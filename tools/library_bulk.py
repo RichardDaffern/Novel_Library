@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Plan selected novels across NovelFull and FreeWebNovel by saved titles or URLs.
+"""Plan validated multi-website novel downloads by saved names or exact URLs.
 
 GitHub's manual workflow has no dynamic multi-select input. Accept a
 comma/semicolon/newline-separated name list and a static website choice.
@@ -16,14 +16,18 @@ from pathlib import Path
 import re
 from urllib.parse import urlsplit
 
-from tools.bulk_download import MAX_NOVELS, parse_novel_urls
+from tools.bulk_download import parse_novel_urls
 from tools.download_registry import (
     already_available, canonical_url, normalise_range, read_registry,
     website_name,
 )
 from tools.freewebnovel_probe import validate_book_url
+from tools.verified_crosspost_download import _verified_record
 
-SITES = ("NovelFull", "FreeWebNovel")
+# This is GitHub's actual matrix execution limit, not an artificial ten-book
+# restriction. Only *scheduled* downloads count, not cached/skipped books.
+MAX_MATRIX_JOBS = 256
+SITES = ("NovelFull", "FreeWebNovel", "Scribble Hub")
 WEBSITE_CHOICES = ("All",) + SITES
 DEFAULT_CATALOGUE = Path("novel_sources.json")
 
@@ -37,6 +41,11 @@ def _validated_url(value: str) -> tuple[str, str]:
     site = website_name(url)
     if site == "FreeWebNovel":
         return site, validate_book_url(url)
+    if site == "Scribble Hub":
+        # Uses only verified same-author cross-posts; never try direct
+        # Scribble Hub chapter scraping for arbitrary series URLs.
+        canonical, _, _ = _verified_record(url)
+        return site, canonical
     if site == "NovelFull":
         # Prevent accidental use of unsupported websites/novel pages.
         if not re.fullmatch(r"/[a-z0-9_-]+\.html", urlsplit(url).path):
@@ -85,6 +94,7 @@ def parse_names(raw: str, names: list[str]) -> list[str]:
 def selection_plan(
     registry: dict, curated: dict, names: str, urls: str, website: str = "All",
     chapter_range: str = "", force: bool = False,
+    confirm_rights: bool = False,
 ) -> dict:
     if website not in WEBSITE_CHOICES:
         raise ValueError(f"Website must be one of: {', '.join(WEBSITE_CHOICES)}")
@@ -127,9 +137,18 @@ def selection_plan(
             )
         item = next((entry for entry in entries if entry["url"] == url), None)
         chosen[url] = item or {"url": url, "title": url.rsplit("/", 1)[-1], "site": site}
-    if len(chosen) > MAX_NOVELS:
-        raise ValueError(f"Maximum {MAX_NOVELS} distinct novels per bulk run")
     rng = normalise_range(chapter_range)
+    if any(item["site"] == "Scribble Hub" for item in chosen.values()):
+        if not confirm_rights:
+            raise ValueError(
+                "Scribble Hub cross-post downloads require the explicit "
+                "I confirm I have permission to archive checkbox"
+            )
+        if rng != "all":
+            raise ValueError(
+                "Scribble Hub's verified cross-post downloader supports full "
+                "novels only; leave the chapter range blank"
+            )
     groups = {site: [] for site in SITES}
     skipped = []
     for item in sorted(chosen.values(), key=lambda i: (i["site"], i["title"].casefold(), i["url"])):
@@ -143,6 +162,14 @@ def selection_plan(
             skipped.append({"site": item["site"], **payload})
         else:
             groups[item["site"]].append(payload)
+    scheduled = sum(len(group) for group in groups.values())
+    if scheduled > MAX_MATRIX_JOBS:
+        raise ValueError(
+            f"GitHub Actions permits at most {MAX_MATRIX_JOBS} matrix jobs per "
+            f"workflow run, but {scheduled} new downloads were selected. "
+            "Split the submission into multiple runs; already-available novels "
+            "do not count."
+        )
     return {
         "version": 1, "website": website, "range": rng,
         "groups": groups, "skipped": skipped,
@@ -158,7 +185,11 @@ def _output(key: str, value: str) -> None:
 
 
 def write_actions(plan: dict) -> None:
-    for site, prefix in (("NovelFull", "novelfull"), ("FreeWebNovel", "freewebnovel")):
+    for site, prefix in (
+        ("NovelFull", "novelfull"),
+        ("FreeWebNovel", "freewebnovel"),
+        ("Scribble Hub", "scribblehub"),
+    ):
         group = plan["groups"][site]
         _output(f"has_{prefix}", "true" if group else "false")
         _output(f"{prefix}_matrix", json.dumps({
@@ -194,6 +225,10 @@ def main(argv=None) -> int:
     parser.add_argument("--website", default="All", choices=WEBSITE_CHOICES)
     parser.add_argument("--chapter-range", default="")
     parser.add_argument("--force", action="store_true")
+    parser.add_argument(
+        "--confirm-rights", action="store_true",
+        help="Required when the selection contains a Scribble Hub cross-post",
+    )
     parser.add_argument("--registry", type=Path, default=Path("downloaded_novels.json"))
     parser.add_argument("--catalogue", type=Path, default=DEFAULT_CATALOGUE)
     parser.add_argument("--plan-file", type=Path, default=Path("library_bulk_plan.json"))
@@ -208,8 +243,10 @@ def main(argv=None) -> int:
                                  if e["site"] == site}, key=str.casefold)
                 print("\n".join(f"- {title}" for title in unique) or "(no saved novels)")
             return 0
-        plan = selection_plan(registry, curated, args.names, args.urls,
-                              args.website, args.chapter_range, args.force)
+        plan = selection_plan(
+            registry, curated, args.names, args.urls,
+            args.website, args.chapter_range, args.force, args.confirm_rights,
+        )
         args.plan_file.write_text(json.dumps(plan, indent=2, ensure_ascii=False) + "\n",
                                   encoding="utf-8")
         write_actions(plan)
