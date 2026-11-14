@@ -208,7 +208,8 @@ def download_range(
             raise DownloadError(f"Chapter {number} repeats an earlier chapter")
         name_txt = f"chapter_{number:05d}.txt"
         content = f"{item['title']}\n\n{item['text'].strip()}\n"
-        (book / name_txt).write_text(content, encoding="utf-8")
+        # Keep bytes LF-normalised on Windows; sha256 is over these exact bytes.
+        (book / name_txt).write_bytes(content.encode("utf-8"))
         row = {
             "position": number, "chapter_number": number, "title": item["title"],
             "file": name_txt, "word_count": len(item["text"].split()),

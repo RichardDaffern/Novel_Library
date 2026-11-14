@@ -1,4 +1,5 @@
 """Offline unit and integration tests for FreeWebNovel's isolated archive flow."""
+from hashlib import sha256
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import json
@@ -87,6 +88,12 @@ class FreeWebNovelDownloaderTests(unittest.TestCase):
                 [1, 2],
             )
             self.assertFalse((folder / ".progress.json").exists())
+            # SHA-256 is defined over the actual ZIP/TXT bytes, not text
+            # normalised by Python's read_text() on Windows.
+            for row in json.loads((folder / "chapters.json").read_text()):
+                chapter_bytes = (folder / row["file"]).read_bytes()
+                self.assertEqual(sha256(chapter_bytes).hexdigest(), row["sha256"])
+                self.assertNotIn(b"\r\n", chapter_bytes)
             with ZipFile(folder / "source.epub") as archive:
                 self.assertIsNone(archive.testzip())
             book, chapters = epub_chapters(folder / "source.epub")

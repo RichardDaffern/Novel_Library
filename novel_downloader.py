@@ -216,7 +216,8 @@ def _export_epub_files(epub_path: Path, output_dir: Path, source_url: str | None
         used_names.add(filename)
         content = f"{title}\n\n{chapter['text'].strip()}\n"
         destination = output_dir / filename
-        destination.write_text(content, encoding="utf-8")
+        # Encode once so chapter bytes match the manifest digest on Windows too.
+        destination.write_bytes(content.encode("utf-8"))
         results.append({
             "position": first_position + ordinal - 1, "chapter_number": number,
             "title": title, "file": filename,
