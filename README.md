@@ -15,6 +15,7 @@ Other investigated sources are **not** full-book download options:
 
 | Website | Current capability |
 | --- | --- |
+| [Scribble Hub](https://www.scribblehub.com/) | FanFicFare adapter exists, but the 14 November 2026 GitHub Actions metadata test received HTTP 403; no supported download workflow |
 | [WebNovel](https://www.webnovel.com/) | Limited public-page tests and offline import of chapters you have saved with permission; no full website downloader |
 | [Royal Road](https://www.royalroad.com/) | Offline conversion of an already-authorised local EPUB; no enabled site-download workflow |
 | [WTR-Lab](https://wtr-lab.com/) | Offline conversion of an already-authorised local EPUB; no enabled site-download workflow |

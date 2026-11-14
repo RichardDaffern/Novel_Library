@@ -10,6 +10,7 @@ Back to the [README](../README.md) · [Detailed download guide](DOWNLOAD_GUIDE.m
 | --- | --- | --- | --- |
 | **NovelFull** (`novelfull.com`) | **Yes** | FanFicFare-powered single or bulk chapter-range downloads; verified whole-book EPUB assembly | [NovelFull workflow](../.github/workflows/download-novel.yml), [bulk workflow](../.github/workflows/library-bulk-download.yml) |
 | **FreeWebNovel** (`freewebnovel.com`) | **Yes**, accessible public chapters only | Dedicated sequential downloader; validated range assembly, single or bulk | [FreeWebNovel workflow](../.github/workflows/freewebnovel-download.yml), [bulk workflow](../.github/workflows/library-bulk-download.yml) |
+| **Scribble Hub** (`scribblehub.com`) | **No** (live metadata test blocked) | FanFicFare's existing adapter recognises series URLs; GitHub Actions metadata discovery returned HTTP 403 | [Scribble Hub feasibility](#scribble-hub) |
 | **WebNovel** (`webnovel.com`) | **No** | Book metadata probe, at most two public test chapters where accessible; offline saved-HTML/TXT/JSON imports | [WebNovel probes and import tools](#webnovel) |
 | **Royal Road** (`royalroad.com`) | **No enabled website-download workflow** | Convert an already-authorised local EPUB; offline saved-page feasibility | [Local EPUB importer](../tools/import_local_epub.py) |
 | **WTR-Lab** (`wtr-lab.com`) | **No** | Convert an already-authorised local EPUB; offline saved-page feasibility | [Local EPUB importer](../tools/import_local_epub.py) |
@@ -59,6 +60,20 @@ Use **[Library - Bulk Download](../.github/workflows/library-bulk-download.yml)*
 This is deliberately the **only** combined bulk menu. A completed artefact recorded in the download registry is skipped unless Force is selected; previously validated chapter batches can also be reused. Details: [download guide](DOWNLOAD_GUIDE.md).
 
 ## Websites without full-download support
+
+### Scribble Hub
+
+- **Website:** https://www.scribblehub.com/
+- **Typical URL:** `https://www.scribblehub.com/series/<numeric-id>/<story-slug>/`
+- **Status as tested on 14 November 2026:** **not a supported automated download site for Novel_Library**.
+- **Existing dependency support:** `fanficfare==4.63.0` includes `adapter_scribblehubcom.py`, which recognises Scribble Hub series URLs, discovers metadata and chapters through the site adapter, and extracts chapter pages when accessible. The adapter performs a POST to `/wp-admin/admin-ajax.php` during chapter-index discovery.
+- **Live test:** [GitHub Actions run #43567663190](https://github.com/RichardDaffern/Novel_Library/actions/runs/43567663190), isolated branch `test/scribblehub-metadata-20261114`. The installed adapter **recognised** `https://www.scribblehub.com/series/2677327/blueflame-the-starless-king/`, but FanFicFare's metadata-only CLI returned an **HTTP 403 Forbidden** error. The diagnostic deliberately suppresses raw page contents, so this test does **not** isolate whether the 403 arose on the series-page request or the chapter-index AJAX request.
+- **Test boundaries:** no story chapters were requested or saved, no EPUB or ZIP was generated, no proxies/login/challenge handling were used, and no production downloader, bulk menu or registry was altered. The diagnostic step was intentionally `continue-on-error`, so a green overall Actions run must **not** be mistaken for successful Scribble Hub discovery.
+- **External evidence:** upstream FanFicFare [issue #1353](https://github.com/JimmXinu/FanFicFare/issues/1353) reported a 403 on the AJAX endpoint in June 2026; [issue #1397](https://github.com/JimmXinu/FanFicFare/issues/1397) recorded an access-challenge/HTML mismatch, with a later September 2026 report of intermittent recovery. Current site access can vary.
+- **Legal/permissions:** Scribble Hub's [Terms of Service](https://www.scribblehub.com/terms-of-service/) do not grant blanket permission to archive other authors' chapters. Reading a public series page does not establish permission to download and distribute its novel.
+- **Decision:** retain Scribble Hub as **feasibility only**. Do **not** add it to the unified bulk website dropdown, launch chapter downloads, or create a production workflow on the strength of an adapter being present. A future implementation needs verified permitted access, reliable metadata and chapter discovery, two authorised chapter fixtures, and all normal archive-integrity tests. If the site refuses automated access, stop instead of attempting to evade protections.
+
+For development background see [experimental source research](experimental-sources.md#scribble-hub-feasibility).
 
 ### Royal Road and WTR-Lab
 
