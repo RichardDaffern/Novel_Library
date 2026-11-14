@@ -146,6 +146,8 @@ class LocalEpubArchiveTests(unittest.TestCase):
                 "https://evil.scribblehub.com/series/2677327/title/",
                 "https://www.scribblehub.com.evil.com/series/2677327/title/",
                 "https://user:password@www.scribblehub.com/series/2677327/title/",
+                "https://@www.scribblehub.com/series/2677327/title/",
+                "https://www.scribblehub.com:/series/2677327/title/",
                 "https://www.scribblehub.com:8443/series/2677327/title/",
                 "https://www.scribblehub.com/read/2677327-title/chapter/12345/",
                 "https://www.scribblehub.com/series/2677327/title/chapter/12345/",
