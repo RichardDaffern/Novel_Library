@@ -109,6 +109,7 @@ def _text(value: str) -> str:
 SITE_LABELS = {
     "novelfull.com": "NovelFull",
     "freewebnovel.com": "FreeWebNovel",
+    "scribblehub.com": "Scribble Hub",
 }
 
 

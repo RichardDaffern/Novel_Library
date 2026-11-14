@@ -45,13 +45,17 @@ The PDF converter also limits input to 1 GiB and 50,000 pages by default. Its fi
 
 This is a **special-case, verified author cross-post**, not a generic Scribble Hub scraper or a new bulk workflow. Scribble Hub's HTTP 403 blocked direct GitHub Actions retrieval, but the author MonkWithAPen has independently posted the same title as FanFiction.net work `14031894`. FicHub explicitly documents an EPUB export API for FanFiction.net stories and requests serial calls, a project User-Agent and respect for HTTP 429.
 
-From the **Novel_Library root** on Windows, after `python -m pip install -r requirements.lock`:
+**Recommended GitHub Actions workflow:** open [Scribble Hub - Download](https://github.com/RichardDaffern/Novel_Library/actions/workflows/scribblehub-download.yml), choose **Run workflow**, enter the Scribble Hub URL (currently series `445037` only), tick **I confirm that I have permission to archive this work**, and start the run. **Force** bypasses an existing unexpired registry entry; otherwise the Action skips already available downloads.
+
+The Action fetches the registered same-author FanFiction.net cross-post through FicHub and validates all chapters. It then exposes **one novel folder** in the GitHub Actions artefact ZIP, with `source.epub`, `metadata.json`, `chapters.json`, numbered UTF-8 chapter files, and optional cover. No ZIP-inside-ZIP nesting. The finished artefact is retained for **seven days** and registered in `downloaded_novels.json` through the normal metadata-only PR process. Use **Download-All-Novels.cmd** to save it as a normal reader-compatible ZIP. As with NovelFull, **public repository artefacts can be accessed by other people**, so only run this when permitted to archive and potentially share the content.
+
+**Local alternative:** from the **Novel_Library root** on Windows, after `python -m pip install -r requirements.lock`:
 
 ~~~cmd
 python -m tools.verified_crosspost_download "https://www.scribblehub.com/series/445037/the-adventurous-gamer-ninja--daichi-hekima/" --confirm-rights
 ~~~
 
-The tool uses `tools/verified_crossposts.json` to match the numeric Scribble Hub ID to the exact same-author FanFiction.net work. It retrieves the source EPUB from FicHub's documented API, verifies the source identity and chapter count, removes only recognised non-story EPUB front matter, and reuses the atomic `tools.import_local_epub` writer to produce a fully validated `Downloaded_Novels/novel-<stable-ID>.zip`. There is **no need to have an EPUB beforehand**. The raw downloaded EPUB and temporary chapters are removed after the final ZIP validates.
+The Action and local command use `tools/verified_crossposts.json` to match the numeric Scribble Hub ID to the exact same-author FanFiction.net work. It retrieves the source EPUB from FicHub's documented API, verifies the source identity and chapter count, removes only recognised non-story EPUB front matter, and reuses the atomic `tools.import_local_epub` writer to produce a fully validated `Downloaded_Novels/novel-<stable-ID>.zip`. There is **no need to have an EPUB beforehand**. The raw downloaded EPUB and temporary chapters are removed after the final ZIP validates.
 
 Use `--replace` only for deliberate updates. An existing ZIP is not overwritten automatically. This method does **not** work for arbitrary Scribble Hub IDs; those fail closed rather than guessing an unrelated cross-post. It does not bypass the source site's challenge or read protected/premium chapters. Use only when you have permission to archive the work.
 
