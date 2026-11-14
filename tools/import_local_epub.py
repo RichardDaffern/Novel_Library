@@ -78,8 +78,10 @@ def _import_source_url(source_url: str) -> tuple[str, str]:
             raise LocalImportError("Invalid source URL") from exc
         if (parts.hostname or "").lower() not in ("scribblehub.com", "www.scribblehub.com"):
             raise LocalImportError(str(original)) from original
-        if (parts.scheme != "https" or parts.username or parts.password
-                or port is not None or parts.query or parts.fragment):
+        if (parts.scheme != "https" or parts.username is not None
+                or parts.password is not None or port is not None
+                or parts.netloc.lower() not in ("scribblehub.com", "www.scribblehub.com")
+                or parts.query or parts.fragment):
             raise LocalImportError(
                 "Scribble Hub source must be an HTTPS series URL without credentials, "
                 "ports, query parameters or fragments"
