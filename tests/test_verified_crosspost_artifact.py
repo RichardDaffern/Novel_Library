@@ -116,6 +116,8 @@ class VerifiedActionsArtifactTests(unittest.TestCase):
         self.assertIn("      confirm_rights:", workflow)
         self.assertIn("        default: false", workflow)
         self.assertIn("tools.verified_crosspost_download", workflow)
+        self.assertIn("id: download", workflow)
+        self.assertIn("Explain FicHub export failure", workflow)
         self.assertIn("tools.verified_crosspost_artifact", workflow)
         self.assertIn("tools.download_registry check", workflow)
         self.assertIn("tools.publish_registry", workflow)

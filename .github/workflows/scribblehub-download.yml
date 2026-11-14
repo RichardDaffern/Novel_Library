@@ -86,6 +86,7 @@ jobs:
           echo "The requested novel already has an unexpired completed artefact." >> "$GITHUB_STEP_SUMMARY"
 
       - name: Download and verify author cross-post
+        id: download
         if: steps.registry.outputs.skip != 'true'
         env:
           NOVEL_URL: ${{ steps.source.outputs.url }}
@@ -94,6 +95,15 @@ jobs:
         run: |
           python -u -m tools.verified_crosspost_download "$NOVEL_URL" \
             --confirm-rights --output-dir downloaded_zip
+
+      - name: Explain FicHub export failure
+        if: ${{ failure() && steps.download.conclusion == 'failure' }}
+        run: |
+          echo "::error::The author cross-post export failed. Inspect the FicHub error code above."
+          echo "### Download failed before publishing any novel" >> "$GITHUB_STEP_SUMMARY"
+          echo "FicHub may be temporarily unavailable. Check the error code in the download step." >> "$GITHUB_STEP_SUMMARY"
+          echo "If err=-7, the provider has restricted exports: do not retry or bypass it." >> "$GITHUB_STEP_SUMMARY"
+          echo "For other failures, wait before trying again; the workflow never publishes partial archives." >> "$GITHUB_STEP_SUMMARY"
 
       - name: Prepare standard novel artefact folder
         if: steps.registry.outputs.skip != 'true'
