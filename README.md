@@ -11,11 +11,11 @@ A Python toolkit for downloading **authorised** web novels, assembling complete 
 | [NovelFull](https://novelfull.com/) | **Yes**, using FanFicFare and verified chapter batches | **NovelFull - Download** or **Library - Bulk Download** |
 | [FreeWebNovel](https://freewebnovel.com/) | **Yes**, for accessible public chapters, with chapter-by-chapter validation | **FreeWebNovel - Download** or **Library - Bulk Download** |
 
-Other investigated sources are **not** full-book download options:
+Other sources have restricted or specialised options, not general-purpose website downloaders:
 
 | Website | Current capability |
 | --- | --- |
-| [Scribble Hub](https://www.scribblehub.com/) | Offline import of an authorised EPUB into a validated ZIP; live metadata access returned HTTP 403, so no website-download workflow |
+| [Scribble Hub](https://www.scribblehub.com/) | **One verified author cross-post** (series `445037`) can be fetched automatically via FicHub; other series require offline EPUB import or separate verification. Direct Scribble Hub requests remain blocked |
 | [WebNovel](https://www.webnovel.com/) | Limited public-page tests and offline import of chapters you have saved with permission; no full website downloader |
 | [Royal Road](https://www.royalroad.com/) | Offline conversion of an already-authorised local EPUB; no enabled site-download workflow |
 | [WTR-Lab](https://wtr-lab.com/) | Offline conversion of an already-authorised local EPUB; no enabled site-download workflow |
@@ -54,6 +54,16 @@ python -u novel_downloader.py "https://novelfull.com/your-novel.html" --confirm-
 ~~~
 
 Use a real supported book URL in place of the illustrative URL. For verified full-book completeness, the GitHub Actions workflows are preferable to a direct download without a known chapter count.
+
+## Download the verified Scribble Hub cross-post
+
+For the author's *The Adventurous Gamer Ninja - Daichi Hekima* (series `445037`), there is an internet-based **FicHub + FanFiction.net author-cross-post** route; no pre-existing EPUB is needed:
+
+~~~powershell
+python -m tools.verified_crosspost_download "https://www.scribblehub.com/series/445037/the-adventurous-gamer-ninja--daichi-hekima/" --confirm-rights
+~~~
+
+Run from the Novel_Library root after installing `requirements.lock`. The CLI validates the author's cross-post, the full story count, EPUB structure and ZIP checksums, then saves a ZIP in `Downloaded_Novels/`. **Other Scribble Hub IDs are rejected unless a verified same-author cross-post is registered.** The tool does not query Scribble Hub directly or circumvent its HTTP 403. [How it works](docs/WEBSITE_SUPPORT.md#scribble-hub).
 
 ## Get completed novels onto Windows
 

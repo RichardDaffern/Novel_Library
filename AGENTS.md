@@ -547,7 +547,7 @@ The converter works only on **selectable-text PDFs**. Image-only/scanned input f
 
 ## 12. Local EPUB conversion for other authorised sources
 
-`tools/import_local_epub.py` is a **network-free** converter for EPUBs already supplied by the user with the necessary rights. It currently recognises permitted source-URL shapes for **Royal Road** and **WTR-Lab**. A source URL labels the output's identity; the program does not fetch the EPUB from that URL.
+`tools/import_local_epub.py` is a **network-free** converter for EPUBs already supplied by the user with the necessary rights. It recognises strict permitted source-URL shapes for **Royal Road**, **WTR-Lab** and **Scribble Hub**. This offline importer is separate from the author-verified cross-post internet retriever described below. A source URL labels the output's identity; the program does not fetch the EPUB from that URL.
 
 Example:
 
@@ -624,11 +624,26 @@ Different sites have different technical and permission restrictions. A parser e
 | FreeWebNovel | Separate production public-page range downloader | Sequential requests, restrictions respected, missing chapters fail closed |
 | Royal Road | Offline feasibility and authorised local EPUB import | No enabled live GitHub bulk downloader here |
 | WTR-Lab | Offline feasibility and authorised local EPUB import | No automated website downloader enabled |
+| Scribble Hub | Authorised offline EPUB import; **one** verified same-author FFN cross-post via FicHub | Direct Scribble Hub HTTP 403; no general site downloader or bulk menu |
 | Novel Fire | Offline saved-HTML feasibility only | No automated novel crawling; respect published restrictions |
 | Light Novel Pub | Offline saved-HTML feasibility only | No full downloader enabled |
 | WebNovel | Read-only public metadata, HTTP/browser feasibility, constrained two-public-chapter tests, authorised saved-page/JSON/TXT imports | No unrestricted WebNovel all-chapter downloader, no locked content or challenge bypass |
 | Local selectable-text PDF | Production offline conversion | Source review, no OCR |
 | Authorised local EPUB | Production offline conversion | Source identity and archive validation |
+
+### Author-verified Scribble Hub cross-post through FicHub
+
+`tools/verified_crosspost_download.py` is a **narrow, internet-enabled** route, distinct from both the direct NovelFull/FreeWebNovel downloaders and the network-free `tools/import_local_epub.py`:
+
+- The user provides the original Scribble Hub **series** URL and `--confirm-rights`; no local EPUB is required. The command is `python -m tools.verified_crosspost_download "<scribble-hub-series-url>" --confirm-rights`.
+- `tools/verified_crossposts.json` is an explicit author cross-post allowlist. Currently it contains only Scribble Hub series `445037`, by MonkWithAPen, cross-posted by the same author as FanFiction.net story `14031894`. **Never** infer the mirror for an unrelated series simply from a similar title.
+- The downloader calls FicHub's documented `/api/v0/epub` and its same-host EPUB cache, **not** Scribble Hub's pages or the protected chapter AJAX endpoint. Source URL validation, story author/title/FFN numeric ID, reported count, first-chapter title and a numbered checkpoint are fail-closed.
+- The 14 November 2026 remote test found **432** author-posted story chapters and a FicHub EPUB containing **two non-story introductory sections plus 432 actual chapters**. The code excludes only the two registered front sections when the verified first story chapter follows. If this structure or count changes unexpectedly, stop rather than silently shift chapters.
+- Preserve cover and EPUB description if present, reconstruct a clean EPUB with exactly the story chapters, and call the **existing** `import_epub_to_zip` to stage and verify chapter SHA-256, EPUB integrity, ZIP CRC, metadata and stable Scribble numeric-ID identity. The command publishes to `Downloaded_Novels/` and requires `--replace` for updating an existing ZIP.
+- FicHub's API is unstable and may be temporarily rate-limited or stale. Use a custom project User-Agent with contact; perform at most one export request plus one ebook request per operation; **no concurrent calls or automatic retries**. Do not expose or commit story text or upload the ebook into a public CI artefact.
+- Tests in `tests/test_verified_crosspost_download.py` use wholly synthetic EPUB fixtures and injected fake HTTP clients; they cover provenance, chapter completeness, front-matter exclusion, bad URL handling, rights, failed requests and rollback. Keep NovelFull and FreeWebNovel regressions green.
+
+This route does **not** mean Scribble Hub's direct HTTPS chapter requests can be automated reliably. Unknown series IDs must fail with a clear explanation until another same-author cross-post is independently verified and registered.
 
 ### WebNovel modules
 
