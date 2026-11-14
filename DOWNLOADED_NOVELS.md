@@ -27,19 +27,19 @@ Expired artifacts cannot be retrieved; such entries remain as history but will n
 | [God Rank Upgrade System](https://novelfull.com/god-rank-upgrade-system.html) | all | 1479 | [Available](https://github.com/RichardDaffern/Novel_Library/actions/runs/42513447856/artifacts/13644734351) | 2026-11-16T02:33:38Z |
 | [Godly Model Creator](https://novelfull.com/godly-model-creator.html) | all | 1085 | [Available](https://github.com/RichardDaffern/Novel_Library/actions/runs/42513447856/artifacts/13645836077) | 2026-11-16T02:36:42Z |
 | [Great Demon King](https://novelfull.com/great-demon-king.html) | all | 1028 | [Available](https://github.com/RichardDaffern/Novel_Library/actions/runs/42513447856/artifacts/13650731871) | 2026-11-16T04:51:47Z |
-| [Heaven’s Devourer](https://novelfull.com/heavens-devourer.html) | all | 1829 | [Available](https://github.com/RichardDaffern/Novel_Library/actions/runs/42513447856/artifacts/13654866424) | 2026-11-16T06:46:01Z |
 | [Heavenly Jewel Change](https://novelfull.com/heavenly-jewel-change.html) | all | 848 | [Available](https://github.com/RichardDaffern/Novel_Library/actions/runs/42513447856/artifacts/13654852471) | 2026-11-16T06:45:33Z |
+| [Heaven’s Devourer](https://novelfull.com/heavens-devourer.html) | all | 1829 | [Available](https://github.com/RichardDaffern/Novel_Library/actions/runs/42513447856/artifacts/13654866424) | 2026-11-16T06:46:01Z |
 | [I Alone Level-Up](https://novelfull.com/i-alone-level-up.html) | all | 270 | [Available](https://github.com/RichardDaffern/Novel_Library/actions/runs/42513348683/artifacts/13634103379) | 2026-11-15T21:14:14Z |
 | [I am a Gao Fushuai Villain](https://novelfull.com/i-am-a-gao-fushuai-villain.html) | all | 650 | [Available](https://github.com/RichardDaffern/Novel_Library/actions/runs/42513447856/artifacts/13655021841) | 2026-11-16T06:53:24Z |
 | [I am the Monarch](https://novelfull.com/i-am-the-monarch.html) | all | 336 | [Available](https://github.com/RichardDaffern/Novel_Library/actions/runs/42513431015/artifacts/13634498595) | 2026-11-15T21:18:11Z |
 | [I Can Track Everything](https://novelfull.com/i-can-track-everything.html) | all | 907 | [Available](https://github.com/RichardDaffern/Novel_Library/actions/runs/42368776684/artifacts/13574863593) | 2026-11-14T12:55:20Z |
 | [I Cultivate Passively](https://novelfull.com/i-cultivate-passively.html) | all | 657 | [Available](https://github.com/RichardDaffern/Novel_Library/actions/runs/42513431015/artifacts/13634707533) | 2026-11-15T21:18:45Z |
 | [I Have the Alchemy Emperor in My Head](https://novelfull.com/i-have-the-alchemy-emperor-in-my-head.html) | all | 2555 | [Available](https://github.com/RichardDaffern/Novel_Library/actions/runs/42513431015/artifacts/13636831037) | 2026-11-15T22:13:06Z |
-| [I’ll Add Points To All Things](https://novelfull.com/ill-add-points-to-all-things.html) | all | 945 | [Available](https://github.com/RichardDaffern/Novel_Library/actions/runs/42513431015/artifacts/13641833043) | 2026-11-16T00:59:34Z |
-| [I’m Really a Superstar](https://novelfull.com/im-really-a-superstar.html) | all | 1696 | [Available](https://github.com/RichardDaffern/Novel_Library/actions/runs/42513431015/artifacts/13643775900) | 2026-11-16T01:31:41Z |
 | [Immortal Devil Transformation](https://novelfull.com/immortal-devil-transformation.html) | all | 869 | [Available](https://github.com/RichardDaffern/Novel_Library/actions/runs/42513431015/artifacts/13645170874) | 2026-11-16T02:11:51Z |
 | [Imperial God Emperor](https://novelfull.com/imperial-god-emperor.html) | all | 1371 | [Available](https://github.com/RichardDaffern/Novel_Library/actions/runs/42513431015/artifacts/13651502124) | 2026-11-16T05:12:15Z |
 | [Invincible](https://novelfull.com/invincible.html) | all | 3753 | [Available](https://github.com/RichardDaffern/Novel_Library/actions/runs/42513431015/artifacts/13653866052) | 2026-11-16T06:14:23Z |
+| [I’ll Add Points To All Things](https://novelfull.com/ill-add-points-to-all-things.html) | all | 945 | [Available](https://github.com/RichardDaffern/Novel_Library/actions/runs/42513431015/artifacts/13641833043) | 2026-11-16T00:59:34Z |
+| [I’m Really a Superstar](https://novelfull.com/im-really-a-superstar.html) | all | 1696 | [Available](https://github.com/RichardDaffern/Novel_Library/actions/runs/42513431015/artifacts/13643775900) | 2026-11-16T01:31:41Z |
 | [King of Gods](https://novelfull.com/king-of-gods.html) | all | 1585 | [Available](https://github.com/RichardDaffern/Novel_Library/actions/runs/42513431015/artifacts/13652875528) | 2026-11-16T05:44:28Z |
 | [Legend of Ling Tian](https://novelfull.com/legend-of-ling-tian.html) | all | 713 | [Available](https://github.com/RichardDaffern/Novel_Library/actions/runs/42513431015/artifacts/13655317054) | 2026-11-16T06:57:51Z |
 | [Lord of All Realms](https://novelfull.com/lord-of-all-realms.html) | all | 1823 | [Available](https://github.com/RichardDaffern/Novel_Library/actions/runs/42513414021/artifacts/13636640990) | 2026-11-15T22:12:32Z |
@@ -99,3 +99,9 @@ Expired artifacts cannot be retrieved; such entries remain as history but will n
 | [Very Pure and Ambiguous: The Prequel](https://novelfull.com/very-pure-and-ambiguous-the-prequel.html) | all | 746 | [Available](https://github.com/RichardDaffern/Novel_Library/actions/runs/42494499443/artifacts/13623663134) | 2026-11-15T16:02:24Z |
 | [War Sovereign Soaring The Heavens](https://novelfull.com/war-sovereign-soaring-the-heavens.html) | all | 4718 | [Available](https://github.com/RichardDaffern/Novel_Library/actions/runs/42494499443/artifacts/13627871965) | 2026-11-15T17:57:23Z |
 | [When I Saw The Returns, I Invested In My Future Wife First](https://novelfull.com/when-i-saw-the-returns-i-invested-in-my-future-wife-first.html) | all | 450 | [Available](https://github.com/RichardDaffern/Novel_Library/actions/runs/42494499443/artifacts/13626582748) | 2026-11-15T17:13:00Z |
+
+## Scribble Hub (1 novels)
+
+| Novel | Range | Chapters | Artifact | Expiry (UTC) |
+|---|---|---:|---|---|
+| [The Adventurous Gamer Ninja - Daichi Hekima](https://www.scribblehub.com/series/445037/the-adventurous-gamer-ninja--daichi-hekima) | all | 432 | [Available](https://github.com/RichardDaffern/Novel_Library/actions/runs/43589834773/artifacts/14111234860) | 2026-11-21T11:24:36Z |

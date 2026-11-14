@@ -1624,6 +1624,24 @@
           "expires_at_utc": "2026-11-15T17:13:00Z"
         }
       ]
+    },
+    {
+      "url": "https://www.scribblehub.com/series/445037/the-adventurous-gamer-ninja--daichi-hekima",
+      "title": "The Adventurous Gamer Ninja - Daichi Hekima",
+      "author": "MonkWithAPen",
+      "downloads": [
+        {
+          "range": "all",
+          "status": "complete",
+          "chapter_count": 432,
+          "run_id": 43589834773,
+          "run_url": "https://github.com/RichardDaffern/Novel_Library/actions/runs/43589834773",
+          "artifact_id": 14111234860,
+          "artifact_url": "https://github.com/RichardDaffern/Novel_Library/actions/runs/43589834773/artifacts/14111234860",
+          "completed_at_utc": "2026-11-14T11:24:36Z",
+          "expires_at_utc": "2026-11-21T11:24:36Z"
+        }
+      ]
     }
   ]
 }
