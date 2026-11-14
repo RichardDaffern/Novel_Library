@@ -96,6 +96,41 @@ def _check_source_metadata(meta: dict, entry: dict) -> int:
     return count
 
 
+def _require_successful_export(payload: object) -> dict:
+    """Explain provider failures using codes, never untrusted error prose.
+
+    FicHub v0 reports err=0 on success and may return HTTP 200 for export
+    failures. In particular, err=-7 indicates export restrictions. Respect
+    these restrictions and do not automatically retry provider failures.
+    """
+    if not isinstance(payload, dict) or type(payload.get("err")) is not int:
+        raise CrosspostDownloadError("FicHub returned malformed export metadata (missing integer err code)")
+    code = payload["err"]
+    if code == 0:
+        return payload
+    if code == -7:
+        raise CrosspostDownloadError(
+            "FicHub has restricted exports of this work (err=-7); do not retry "
+            "or bypass the restriction"
+        )
+    ret = payload.get("ret")
+    ret_info = f", ret={ret}" if type(ret) is int else ""
+    # Never echo the provider's raw msg/res fields. They are untrusted data
+    # and could contain story text, private URLs or excessive error details.
+    message = str(payload.get("msg", "")).lower()[:300]
+    category = (
+        "source lookup" if "unable to find" in message
+        else "timeout" if "timed out" in message or "timeout" in message
+        else "unavailable" if "unavailable" in message
+        else "unspecified provider failure"
+    )
+    raise CrosspostDownloadError(
+        f"FicHub export failed (err={code}{ret_info}; {category}). "
+        "No novel ZIP was published. If this is a temporary provider failure, "
+        "try again later; repeated failures may require FicHub support."
+    )
+
+
 def _epub_url(payload: dict) -> str:
     raw = payload.get("epub_url") or (payload.get("urls") or {}).get("epub")
     if not isinstance(raw, str) or not raw.startswith("/cache/epub/"):
@@ -251,8 +286,7 @@ def download_verified_crosspost(
             payload = response.json()
         finally:
             response.close()
-        if not isinstance(payload, dict) or payload.get("err") != 0:
-            raise CrosspostDownloadError("FicHub declined to export this work")
+        payload = _require_successful_export(payload)
         count = _check_source_metadata(payload.get("meta"), entry)
         link = _epub_url(payload)
         with tempfile.TemporaryDirectory(prefix="verified-crosspost-") as directory:

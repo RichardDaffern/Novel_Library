@@ -8,7 +8,8 @@ from zipfile import ZipFile
 
 from tools.chunked_download import _epub
 from tools.verified_crosspost_download import (
-    CrosspostDownloadError, _epub_url, download_verified_crosspost,
+    CrosspostDownloadError, _epub_url, _require_successful_export,
+    download_verified_crosspost,
 )
 
 SH = "https://www.scribblehub.com/series/445037/the-adventurous-gamer-ninja--daichi-hekima/"
@@ -180,6 +181,37 @@ class CrosspostDownloadTests(unittest.TestCase):
                             "err": 0, "meta": meta, "epub_url": EPUB_URL,
                         }), registry=REGISTRY,
                     )
+
+    def test_provider_decline_identifies_code_without_leaking_untrusted_text(self):
+        cases = (
+            ({"err": -1, "ret": -1000, "msg": "unable to find fic", "res": "secret"}, "err=-1, ret=-1000; source lookup"),
+            ({"err": -3, "msg": "timeout in upstream"}, "err=-3; timeout"),
+            ({"err": -7, "msg": "hidden author details"}, "err=-7"),
+            ({"err": None}, "malformed export metadata"),
+        )
+        for payload, expected in cases:
+            with self.subTest(payload=payload), self.assertRaises(CrosspostDownloadError) as ctx:
+                _require_successful_export(payload)
+            self.assertIn(expected, str(ctx.exception))
+            self.assertNotIn("secret", str(ctx.exception))
+            self.assertNotIn("hidden author", str(ctx.exception))
+            self.assertNotIn("timeout in upstream", str(ctx.exception))
+
+    def test_provider_failure_fails_closed_with_no_epub_fetch_or_zip(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            client = FakeClient(manifest={
+                "err": -1, "ret": -1000, "msg": "unable to find fic",
+                "meta": META, "epub_url": EPUB_URL,
+            })
+            with self.assertRaisesRegex(CrosspostDownloadError, r"err=-1, ret=-1000"):
+                download_verified_crosspost(
+                    SH, root / "output", confirm_rights=True,
+                    client=client, registry=REGISTRY,
+                )
+            self.assertEqual(len(client.requests), 1)
+            self.assertEqual(client.requests[0][0], "https://fichub.net/api/v0/epub")
+            self.assertFalse((root / "output").exists())
 
     def test_provider_declines_or_rate_limits_without_chapter_requests(self):
         for manifest, status in (
