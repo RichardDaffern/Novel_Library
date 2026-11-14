@@ -103,7 +103,7 @@ class VerifiedActionsArtifactTests(unittest.TestCase):
                 self.prepare(archive, tmp / "downloads")
             self.assertEqual((first / "source.epub").read_bytes(), previous)
 
-    def test_actions_manual_only_and_does_not_modify_unified_bulk(self):
+    def test_actions_manual_and_reusable_calls_both_supported(self):
         workflow = Path(".github/workflows/scribblehub-download.yml").read_text(
             encoding="utf-8"
         )
@@ -112,7 +112,7 @@ class VerifiedActionsArtifactTests(unittest.TestCase):
         )
         self.assertIn("name: Scribble Hub - Download", workflow)
         self.assertIn("  workflow_dispatch:", workflow)
-        self.assertNotIn("workflow_call:", workflow)
+        self.assertIn("workflow_call:", workflow)
         self.assertIn("      confirm_rights:", workflow)
         self.assertIn("        default: false", workflow)
         self.assertIn("tools.verified_crosspost_download", workflow)
@@ -126,8 +126,11 @@ class VerifiedActionsArtifactTests(unittest.TestCase):
         self.assertIn("retention-days: 7", workflow)
         self.assertIn("if-no-files-found: error", workflow)
         self.assertIn("          ref: main", workflow)
-        self.assertNotIn("ScribbleHub", bulk)
-        self.assertNotIn("scribblehub-download.yml", bulk)
+        self.assertIn("scribblehub-download.yml", bulk)
+        self.assertIn("confirm_rights:", bulk)
+        self.assertIn("max-parallel: 1", bulk)
+        self.assertIn("bulk-successful-novels-", bulk)
+        self.assertIn("tools.bulk_recovery", bulk)
 
 
 if __name__ == "__main__":
