@@ -41,6 +41,24 @@ CI and GitHub download workflows use `requirements.lock`; the PDF converter uses
 
 The PDF converter also limits input to 1 GiB and 50,000 pages by default. Its file hashing and ZIP chapter-member writing avoid whole-document duplicate byte buffers; PDF page analysis and EPUB construction still require memory proportional to novel size.
 
+## Verified Scribble Hub author cross-post: direct internet retrieval
+
+This is a **special-case, verified author cross-post**, not a generic Scribble Hub scraper or a new bulk workflow. Scribble Hub's HTTP 403 blocked direct GitHub Actions retrieval, but the author MonkWithAPen has independently posted the same title as FanFiction.net work `14031894`. FicHub explicitly documents an EPUB export API for FanFiction.net stories and requests serial calls, a project User-Agent and respect for HTTP 429.
+
+From the **Novel_Library root** on Windows, after `python -m pip install -r requirements.lock`:
+
+~~~cmd
+python -m tools.verified_crosspost_download "https://www.scribblehub.com/series/445037/the-adventurous-gamer-ninja--daichi-hekima/" --confirm-rights
+~~~
+
+The tool uses `tools/verified_crossposts.json` to match the numeric Scribble Hub ID to the exact same-author FanFiction.net work. It retrieves the source EPUB from FicHub's documented API, verifies the source identity and chapter count, removes only recognised non-story EPUB front matter, and reuses the atomic `tools.import_local_epub` writer to produce a fully validated `Downloaded_Novels/novel-<stable-ID>.zip`. There is **no need to have an EPUB beforehand**. The raw downloaded EPUB and temporary chapters are removed after the final ZIP validates.
+
+Use `--replace` only for deliberate updates. An existing ZIP is not overwritten automatically. This method does **not** work for arbitrary Scribble Hub IDs; those fail closed rather than guessing an unrelated cross-post. It does not bypass the source site's challenge or read protected/premium chapters. Use only when you have permission to archive the work.
+
+Technical constraints: one FicHub API request and one EPUB request, **no concurrent calls and no automatic retries**; reject HTTP 429/redirects and unrecognised paths; check original title/author/FFN ID against registered values, preserve stable Scribble Hub numeric-series identity, and verify each chapter's byte-level SHA-256, EPUB chapter count and final ZIP CRC before publication.
+
+See the [website capability matrix](WEBSITE_SUPPORT.md#scribble-hub) and [offline tests](../tests/test_verified_crosspost_download.py).
+
 ## GitHub Actions: NovelFull - Download
 
 The NovelFull single-download workflow uses FanFicFare. The separate `CI` workflow runs automatic regression checks and is not a downloadable-novel action.
