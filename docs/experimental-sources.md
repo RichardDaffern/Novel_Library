@@ -138,3 +138,28 @@ The examples illustrate file conversion for content you are permitted to
 keep, **not** permission to archive those example novels. The tool never
 downloads the EPUB or any chapters. A new WTR-Lab or Royal Road bulk option
 is deliberately disabled until reliable, permitted access is confirmed.
+
+## Scribble Hub feasibility
+
+**Last tested:** 14 November 2026. **Status: not enabled for automated downloads.**
+
+The repository's pinned `FanFicFare 4.63.0` already includes a Scribble Hub adapter for `https://www.scribblehub.com/series/<id>/<slug>/` URLs. It reads the public book page and requests the site's chapter table of contents via a `POST` to `/wp-admin/admin-ajax.php`.
+
+We ran an **isolated, metadata-only diagnostic** on a GitHub Actions Ubuntu runner using the repository's pinned dependencies. The test targeted the publicly listed series:
+
+`https://www.scribblehub.com/series/2677327/blueflame-the-starless-king/`
+
+Results:
+
+1. **PASS:** ScribbleHubComAdapter's source URL pattern matched the series ID `2677327`.
+2. **FAIL:** FanFicFare `--non-interactive --meta-only --json-meta --no-output` reported **HTTP 403 Forbidden**. There was no verified chapter count.
+3. **NOT ATTEMPTED:** live chapter-body downloads, two-chapter EPUB/ZIP output, full-novel batch integration or downloads requiring user authorisation.
+4. **PRESERVED:** NovelFull, FreeWebNovel, the unified bulk workflow, real book files and the completed-download registry.
+
+**Evidence:** [Actions diagnostic run #43567663190](https://github.com/RichardDaffern/Novel_Library/actions/runs/43567663190). Its probe step used `continue-on-error` for diagnostic purposes: that run's eventual overall conclusion does not establish Scribble Hub success. The probe suppressed raw stdout/stderr content and reported the **403 error category** only, so the exact failing request (first public book GET versus the table-of-contents AJAX POST) remains unproven.
+
+**Additional references:** [FanFicFare issue #1353](https://github.com/JimmXinu/FanFicFare/issues/1353) and [issue #1397](https://github.com/JimmXinu/FanFicFare/issues/1397) document earlier 403/access-challenge problems and periods of recovery. Scribble Hub's [Terms of Service](https://www.scribblehub.com/terms-of-service/) contain no blanket grant to archive other authors' novels.
+
+**Decision:** keep the source unavailable in the normal Actions and Library - Bulk Download menus. Do not retry rejected requests through proxies or access-control workarounds. Reconsider only with documented permission, permitted accessible public metadata and chapter samples, and deterministic source-specific regression coverage. A user-supplied, authorised EPUB can be considered for a **future** generic offline importer if its source validation is explicitly extended; the current `tools/import_local_epub.py` allows only Royal Road and WTR-Lab URLs.
+
+See [website support](WEBSITE_SUPPORT.md#scribble-hub) for the concise support decision.
