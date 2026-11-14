@@ -118,6 +118,7 @@ def recover(plan: dict, artifact_root: Path, output_dir: Path,
     artifact_root = Path(artifact_root)
     artifacts = sorted(artifact_root.iterdir()) if artifact_root.is_dir() else []
     for artefact in artifacts:
+        dest = None
         if not artefact.is_dir():
             continue
         if not artefact.name.startswith("novel-"):
@@ -172,7 +173,7 @@ def recover(plan: dict, artifact_root: Path, output_dir: Path,
             rejected.append({"artifact": artefact.name, "reason": str(exc)})
             print(f"RECOVERY_SKIPPED {artefact.name}: {exc}", flush=True)
             # Clean up an incomplete ZIP that failed its own checks.
-            if 'dest' in locals() and isinstance(dest, Path) and dest.exists():
+            if isinstance(dest, Path) and dest.exists():
                 dest.unlink()
             dest = None
     missing = [
